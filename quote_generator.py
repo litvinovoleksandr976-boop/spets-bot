@@ -6,13 +6,10 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.graphics.shapes import Drawing, Rect, String, Circle, Line
-from reportlab.graphics import renderPDF
-import datetime, os
+import datetime, os, urllib.request, tempfile
 
-FONT_PATH = "C:/Windows/Fonts/"
-pdfmetrics.registerFont(TTFont("Arial", FONT_PATH + "arial.ttf"))
-pdfmetrics.registerFont(TTFont("Arial-Bold", FONT_PATH + "arialbd.ttf"))
+# Use built-in Helvetica fonts (work on Linux/Railway)
+# Arial -> Helvetica, Arial-Bold -> Helvetica-Bold
 
 ORANGE = colors.HexColor("#E8761A")
 NAVY   = colors.HexColor("#0F1B2D")
@@ -221,13 +218,13 @@ def pick_data(ans):
     return DB[cat][tier]
 
 def S(name,**kw):
-    d=dict(fontName="Arial",fontSize=9,leading=13); d.update(kw)
+    d=dict(fontName="Helvetica",fontSize=9,leading=13); d.update(kw)
     return ParagraphStyle(name,**d)
 
 def hdr_block(W):
     h=Table([[
         Paragraph("<font color='#E8761A'><b>SPETS</b></font> <font color='white'><b>SECURITY</b></font><br/><font color='#666666' size='7'>ALWAYS NEAR</font>",
-                  S("hl",fontName="Arial-Bold",fontSize=18,textColor=colors.white,leading=24)),
+                  S("hl",fontName="Helvetica-Bold",fontSize=18,textColor=colors.white,leading=24)),
         Paragraph("<font color='white'><b>Spets Security LTD</b></font><br/><font color='#888888'>1 Oakcroft Road, Chessington<br/>Surrey, KT9 1BD<br/>VAT: 455026800</font>",
                   S("hr",fontSize=8,textColor=colors.white,leading=13,alignment=TA_RIGHT)),
     ]],colWidths=[W*.5,W*.5])
@@ -247,7 +244,7 @@ def make_product_card(prod, W):
                   S("pi",fontSize=18,textColor=colors.white,alignment=TA_CENTER)),
         Paragraph(f"<font color='white'><b>{prod['name']}</b></font><br/>"
                   f"<font color='#cccccc' size='8'>{prod['brand']}</font>",
-                  S("pn",fontName="Arial-Bold",fontSize=12,textColor=colors.white,leading=16)),
+                  S("pn",fontName="Helvetica-Bold",fontSize=12,textColor=colors.white,leading=16)),
     ]],colWidths=[20*mm,W-20*mm])
     header.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),col),
@@ -259,7 +256,7 @@ def make_product_card(prod, W):
     # Tagline
     tagline = Table([[
         Paragraph(f"<b>{prod['tagline']}</b>",
-                  S("tg",fontName="Arial-Bold",fontSize=11,textColor=col)),
+                  S("tg",fontName="Helvetica-Bold",fontSize=11,textColor=col)),
     ]],colWidths=[W])
     tagline.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#F0F4F8")),
@@ -282,7 +279,7 @@ def make_product_card(prod, W):
     spec_rows = []
     for k,v in specs:
         spec_rows.append([
-            Paragraph(f"<b>{k}</b>",S("sk",fontName="Arial-Bold",fontSize=8,textColor=col)),
+            Paragraph(f"<b>{k}</b>",S("sk",fontName="Helvetica-Bold",fontSize=8,textColor=col)),
             Paragraph(v,S("sv",fontSize=9,textColor=colors.HexColor("#1A1A2E"))),
         ])
     spec_table = Table(spec_rows,colWidths=[35*mm,W-35*mm])
@@ -326,18 +323,18 @@ def generate_quote_pdf(ans:dict)->str:
 
     # Персональний заголовок
     story.append(Paragraph(f"Персональна пропозиція для {name}",
-                           S("pt",fontName="Arial-Bold",fontSize=16,textColor=NAVY,alignment=TA_CENTER,spaceAfter=2)))
+                           S("pt",fontName="Helvetica-Bold",fontSize=16,textColor=NAVY,alignment=TA_CENTER,spaceAfter=2)))
     story.append(Paragraph(f"{data['title']}",
-                           S("pst",fontName="Arial-Bold",fontSize=11,textColor=ORANGE,alignment=TA_CENTER,spaceAfter=2)))
+                           S("pst",fontName="Helvetica-Bold",fontSize=11,textColor=ORANGE,alignment=TA_CENTER,spaceAfter=2)))
     story.append(Paragraph(f"{data['subtitle']}",
                            S("ps",fontSize=9,textColor=MUTED,alignment=TA_CENTER,spaceAfter=12)))
     story.append(HRFlowable(width=W,thickness=1,color=BORDER,spaceAfter=12))
 
     # 3 переваги
     adv=Table([[
-        Paragraph("✓  Офіційний дилер\nHikvision та Ajax в UK",S("a1",fontName="Arial-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
-        Paragraph("✓  Гарантія на монтаж\n12 місяців",S("a2",fontName="Arial-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
-        Paragraph("✓  Встановлення\nза 3-5 днів",S("a3",fontName="Arial-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
+        Paragraph("✓  Офіційний дилер\nHikvision та Ajax в UK",S("a1",fontName="Helvetica-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
+        Paragraph("✓  Гарантія на монтаж\n12 місяців",S("a2",fontName="Helvetica-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
+        Paragraph("✓  Встановлення\nза 3-5 днів",S("a3",fontName="Helvetica-Bold",fontSize=9,textColor=NAVY,alignment=TA_CENTER)),
     ]],colWidths=[W/3,W/3,W/3])
     adv.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),WARM),
@@ -358,7 +355,7 @@ def generate_quote_pdf(ans:dict)->str:
     # Що відбуватиметься — процес роботи
     story.append(HRFlowable(width=W,thickness=1,color=BORDER,spaceAfter=10))
     story.append(Paragraph("Як проходить встановлення?",
-                           S("wh",fontName="Arial-Bold",fontSize=12,textColor=NAVY,spaceAfter=8)))
+                           S("wh",fontName="Helvetica-Bold",fontSize=12,textColor=NAVY,spaceAfter=8)))
 
     steps=Table([[
         Paragraph("<font color='#E8761A'><b>1</b></font><br/><b>Замовлення</b><br/><font color='#7A8494'>Ви підтверджуєте пропозицію та вносите 50% передоплату</font>",
@@ -385,7 +382,7 @@ def generate_quote_pdf(ans:dict)->str:
     # CTA
     cta=Table([[
         Paragraph("Готові замовити? Зв'яжіться з нами!",
-                  S("cta",fontName="Arial-Bold",fontSize=11,textColor=colors.white,alignment=TA_CENTER)),
+                  S("cta",fontName="Helvetica-Bold",fontSize=11,textColor=colors.white,alignment=TA_CENTER)),
         Paragraph("+447706906079  |  r.brain@spetstech.co.uk",
                   S("ctac",fontSize=10,textColor=ORANGE,alignment=TA_CENTER)),
     ]],colWidths=[W*.5,W*.5])
@@ -403,7 +400,7 @@ def generate_quote_pdf(ans:dict)->str:
     story.append(HRFlowable(width=W,thickness=3,color=ORANGE,spaceAfter=5))
 
     strip=Table([[
-        Paragraph("<b>КВОТАЦІЯ</b>",S("tt",fontName="Arial-Bold",fontSize=24,textColor=NAVY)),
+        Paragraph("<b>КВОТАЦІЯ</b>",S("tt",fontName="Helvetica-Bold",fontSize=24,textColor=NAVY)),
         Paragraph(f"Квотація №: <b>{qnum}</b><br/>Дата: <b>{date_str}</b><br/>Дійсна до: <b>{expiry}</b>",
                   S("tr",fontSize=8,textColor=MUTED,leading=14,alignment=TA_RIGHT)),
     ]],colWidths=[W*.5,W*.5])
@@ -435,18 +432,18 @@ def generate_quote_pdf(ans:dict)->str:
     story.append(Spacer(1,4))
 
     cw=[8*mm,W-8*mm-18*mm-24*mm-24*mm-24*mm,18*mm,24*mm,24*mm,24*mm]
-    def th(txt,al=TA_LEFT): return Paragraph(f"<font color='white' size='8'><b>{txt}</b></font>",S("th",fontName="Arial-Bold",alignment=al))
+    def th(txt,al=TA_LEFT): return Paragraph(f"<font color='white' size='8'><b>{txt}</b></font>",S("th",fontName="Helvetica-Bold",alignment=al))
     td=[[th("#"),th("ОПИС ПОЗИЦІЇ"),th("КІЛ.",TA_CENTER),th("ЦІНА £",TA_RIGHT),th("ПДВ £",TA_RIGHT),th("РАЗОМ £",TA_RIGHT)]]
     sub=0
     for i,it in enumerate(items,1):
         net=it["qty"]*it["unit"]; vat=round(net*.2,2); tot=net+vat; sub+=net
         td.append([
-            Paragraph(f"<font color='#E8761A'><b>{i}</b></font>",S("n",fontName="Arial-Bold",alignment=TA_CENTER)),
+            Paragraph(f"<font color='#E8761A'><b>{i}</b></font>",S("n",fontName="Helvetica-Bold",alignment=TA_CENTER)),
             Paragraph(f"<b>{it['name']}</b><br/><font color='#7A8494' size='8'>{it['desc']}</font>",S("d",leading=13)),
             Paragraph(str(it["qty"]),S("q",alignment=TA_CENTER)),
             Paragraph(f"£{it['unit']:.2f}",S("pr",alignment=TA_RIGHT)),
             Paragraph(f"£{vat:.2f}",S("vr",alignment=TA_RIGHT)),
-            Paragraph(f"<b>£{tot:.2f}</b>",S("tr2",fontName="Arial-Bold",alignment=TA_RIGHT)),
+            Paragraph(f"<b>£{tot:.2f}</b>",S("tr2",fontName="Helvetica-Bold",alignment=TA_RIGHT)),
         ])
     tbl=Table(td,colWidths=cw,repeatRows=1)
     tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),NAVY),
@@ -460,8 +457,8 @@ def generate_quote_pdf(ans:dict)->str:
     tots=Table([
         ["",Paragraph("Сума без ПДВ:",S("tl",textColor=MUTED)),Paragraph(f"£{sub:.2f}",S("tv",alignment=TA_RIGHT))],
         ["",Paragraph("ПДВ (20%):",S("tl2",textColor=MUTED)),Paragraph(f"£{vt:.2f}",S("tv2",alignment=TA_RIGHT))],
-        ["",Paragraph("<font color='white'><b>ЗАГАЛЬНА СУМА</b></font>",S("gl",fontName="Arial-Bold",fontSize=11,textColor=colors.white)),
-             Paragraph(f"<font color='#E8761A'><b>£{gr:.2f}</b></font>",S("gv",fontName="Arial-Bold",fontSize=15,textColor=ORANGE,alignment=TA_RIGHT))],
+        ["",Paragraph("<font color='white'><b>ЗАГАЛЬНА СУМА</b></font>",S("gl",fontName="Helvetica-Bold",fontSize=11,textColor=colors.white)),
+             Paragraph(f"<font color='#E8761A'><b>£{gr:.2f}</b></font>",S("gv",fontName="Helvetica-Bold",fontSize=15,textColor=ORANGE,alignment=TA_RIGHT))],
     ],colWidths=[W*.55,W*.25,W*.2])
     tots.setStyle(TableStyle([("LINEABOVE",(0,0),(-1,0),1.5,BORDER),
         ("TOPPADDING",(0,0),(-1,-1),7),("BOTTOMPADDING",(0,0),(-1,-1),7),
