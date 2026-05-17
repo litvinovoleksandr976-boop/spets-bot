@@ -19,7 +19,7 @@ BOT_TOKEN = "8688325915:AAGF9wA942VvdfuHO8h8OyJlGl-s-Kc05Vk"
 
 # Email налаштування
 EMAIL_FROM    = "litvinovoleksandr976@gmail.com"
-EMAIL_PASSWORD = "ovml wxvb rhpp ytpb"
+EMAIL_PASSWORD = "pihk ebls qzzw wubs"
 
 # Стани розмови
 TYPE, PROP, SIZE, BUDGET, NAME, EMAIL_STATE = range(6)
