@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store
+.idea/
+.vscode/
+/tmp/
+spets_quote_counter.txt
