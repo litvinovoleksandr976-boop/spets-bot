@@ -1,23 +1,29 @@
 """
-SPETS SECURITY — PDF Quote Generator
-Generates branded PDF quotes in the style of invoice #183.
-Uses ReportLab (already in requirements).
+SPETS SECURITY — PDF Quote Generator (multilingual EN/RU/UK)
+
+Cyrillic support: uses DejaVu Sans fonts which are bundled with reportlab
+under /usr/share/fonts or as TTF embedded. Falls back to Helvetica for
+English. For Russian/Ukrainian we register DejaVu Sans which supports Cyrillic.
 """
 import io
-from datetime import datetime, timedelta
+import os
+from datetime import datetime
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, Image
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 )
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
-# Brand colours (from invoice #183)
+from translations import t
+
+# Brand colours
 NAVY = colors.HexColor("#14213D")
 ORANGE = colors.HexColor("#FCA311")
 LIGHT_GREY = colors.HexColor("#F0F4F8")
@@ -25,16 +31,54 @@ WHITE = colors.white
 DARK_TEXT = colors.HexColor("#333333")
 MID_GREY = colors.HexColor("#888888")
 
+# Register Cyrillic-capable fonts. Try common Linux paths.
+FONT_NAME = "Helvetica"
+FONT_NAME_BOLD = "Helvetica-Bold"
+CYRILLIC_REGISTERED = False
+
+_FONT_CANDIDATES = [
+    # Path on Debian/Ubuntu (Railway uses these)
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    # Alpine / minimal containers sometimes have these
+    ("/usr/share/fonts/TTF/DejaVuSans.ttf",
+     "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+    # Liberation fonts as alternative
+    ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+]
+
+
+def _register_cyrillic_font():
+    """Try to register a Cyrillic-capable font. Sets globals on success."""
+    global FONT_NAME, FONT_NAME_BOLD, CYRILLIC_REGISTERED
+    for regular_path, bold_path in _FONT_CANDIDATES:
+        if os.path.exists(regular_path):
+            try:
+                pdfmetrics.registerFont(TTFont("CyrSans", regular_path))
+                if os.path.exists(bold_path):
+                    pdfmetrics.registerFont(TTFont("CyrSans-Bold", bold_path))
+                    FONT_NAME = "CyrSans"
+                    FONT_NAME_BOLD = "CyrSans-Bold"
+                else:
+                    FONT_NAME = "CyrSans"
+                    FONT_NAME_BOLD = "CyrSans"
+                CYRILLIC_REGISTERED = True
+                return
+            except Exception:
+                continue
+
+
+_register_cyrillic_font()
+
 
 def _header_footer(canvas_obj: canvas.Canvas, doc):
-    """Draw the orange-navy decorative banner top-left and bottom-right."""
+    """Draw the orange-navy decorative banner."""
     canvas_obj.saveState()
     width, height = A4
 
-    # Top-left navy block
     canvas_obj.setFillColor(NAVY)
     canvas_obj.rect(0, height - 50 * mm, 70 * mm, 50 * mm, fill=1, stroke=0)
-    # Orange diagonal accent (top-left)
     p = canvas_obj.beginPath()
     p.moveTo(0, height - 50 * mm)
     p.lineTo(70 * mm, height - 50 * mm)
@@ -44,7 +88,6 @@ def _header_footer(canvas_obj: canvas.Canvas, doc):
     canvas_obj.setFillColor(ORANGE)
     canvas_obj.drawPath(p, fill=1, stroke=0)
 
-    # Bottom-right accent (mirror)
     canvas_obj.setFillColor(NAVY)
     canvas_obj.rect(width - 70 * mm, 0, 70 * mm, 50 * mm, fill=1, stroke=0)
     p2 = canvas_obj.beginPath()
@@ -61,27 +104,10 @@ def _header_footer(canvas_obj: canvas.Canvas, doc):
 def generate_quote_pdf(quote_data: dict) -> bytes:
     """
     Generate PDF and return bytes.
-
-    quote_data structure:
-    {
-        "quote_number": "184",
-        "date": datetime (or None — auto-set),
-        "customer": {
-            "name": "John Smith",
-            "phone": "+44...",
-            "email": "...",
-            "address": "..." (optional),
-        },
-        "items": [
-            {"name": "...", "sku": "...", "qty": 4, "base": 101.00, "vat": 20.20, "total": 121.20},
-            ...
-        ],
-        "subtotal": 1082.00,
-        "vat_total": 216.40,
-        "discount": 0.00,
-        "grand_total": 1298.40,
-    }
+    quote_data must include 'lang' field (en/ru/uk) — defaults to 'en'.
     """
+    lang = quote_data.get("lang", "en")
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -95,51 +121,38 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
     )
 
     story = []
-    styles = getSampleStyleSheet()
 
-    # Custom styles
+    # Custom styles — use registered Cyrillic font
     h_company = ParagraphStyle(
-        "company", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=12, textColor=NAVY,
+        "company", fontName=FONT_NAME_BOLD, fontSize=12, textColor=NAVY,
         alignment=TA_RIGHT, leading=14,
     )
     s_address = ParagraphStyle(
-        "addr", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=9, textColor=DARK_TEXT,
+        "addr", fontName=FONT_NAME, fontSize=9, textColor=DARK_TEXT,
         alignment=TA_RIGHT, leading=12,
     )
     h_brand = ParagraphStyle(
-        "brand", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=24, textColor=ORANGE,
+        "brand", fontName=FONT_NAME_BOLD, fontSize=24, textColor=ORANGE,
         alignment=TA_RIGHT, leading=26,
     )
     s_tagline = ParagraphStyle(
-        "tagline", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=8, textColor=ORANGE,
+        "tagline", fontName=FONT_NAME, fontSize=8, textColor=ORANGE,
         alignment=TA_RIGHT,
     )
     h_invoice_word = ParagraphStyle(
-        "inv", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=36, textColor=ORANGE,
+        "inv", fontName=FONT_NAME_BOLD, fontSize=36, textColor=ORANGE,
         alignment=TA_RIGHT, leading=40,
     )
     s_normal = ParagraphStyle(
-        "n", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=10, textColor=DARK_TEXT, leading=13,
+        "n", fontName=FONT_NAME, fontSize=10, textColor=DARK_TEXT, leading=13,
     )
     s_bold = ParagraphStyle(
-        "b", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=10, textColor=DARK_TEXT, leading=13,
-    )
-    s_small = ParagraphStyle(
-        "sm", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=8, textColor=MID_GREY, leading=10,
+        "b", fontName=FONT_NAME_BOLD, fontSize=10, textColor=DARK_TEXT, leading=13,
     )
 
-    # =================================================================
-    # TOP: Brand + Address right side (top-left is left for the navy/orange banner from page func)
-    # =================================================================
-    # Spacer to push content below the banner
+    # =====================================================
+    # TOP: brand + address
+    # =====================================================
     story.append(Spacer(1, 5 * mm))
 
     top_right = [
@@ -153,54 +166,64 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
         [[Spacer(1, 1), Table(top_right, colWidths=[80 * mm])]],
         colWidths=[100 * mm, 80 * mm],
     )
-    top_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+    top_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(top_table)
     story.append(Spacer(1, 8 * mm))
 
-    # =================================================================
-    # Invoice block: "Invoice To" (left) | "INVOICE #" (right)
-    # =================================================================
+    # =====================================================
+    # Invoice block
+    # =====================================================
     date_str = (quote_data.get("date") or datetime.now()).strftime("%d %B %Y")
     qn = quote_data["quote_number"]
     cust = quote_data["customer"]
 
     left_block = [
-        [Paragraph("<b>Invoice To</b>", ParagraphStyle("bl", parent=s_bold, fontSize=12, leading=14))],
+        [Paragraph(f"<b>{t('pdf_invoice_to', lang)}</b>",
+                   ParagraphStyle("bl", fontName=FONT_NAME_BOLD, fontSize=12, leading=14))],
         [Paragraph(cust.get("name", "Client"), s_normal)],
         [Paragraph(cust.get("phone", ""), s_normal)],
         [Paragraph(cust.get("email", ""), s_normal)],
         [Paragraph(cust.get("address", ""), s_normal)],
     ]
     right_block = [
-        [Paragraph("<b>INVOICE</b>", h_invoice_word)],
+        [Paragraph(f"<b>{t('pdf_invoice_word', lang)}</b>", h_invoice_word)],
         [Spacer(1, 2 * mm)],
-        [Paragraph(f"<b>Quote # {qn}</b>", ParagraphStyle("qn", parent=s_bold, fontSize=12, alignment=TA_RIGHT))],
-        [Paragraph(f"<b>Date:</b> {date_str}", ParagraphStyle("dt", parent=s_normal, alignment=TA_RIGHT))],
+        [Paragraph(f"<b>{t('pdf_quote_label', lang)} {qn}</b>",
+                   ParagraphStyle("qn", fontName=FONT_NAME_BOLD, fontSize=12, alignment=TA_RIGHT))],
+        [Paragraph(f"<b>{t('pdf_date_label', lang)}</b> {date_str}",
+                   ParagraphStyle("dt", fontName=FONT_NAME, fontSize=10, alignment=TA_RIGHT))],
     ]
 
     inv_table = Table(
         [[Table(left_block, colWidths=[90 * mm]), Table(right_block, colWidths=[80 * mm])]],
         colWidths=[90 * mm, 90 * mm],
     )
-    inv_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+    inv_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(inv_table)
     story.append(Spacer(1, 8 * mm))
 
-    # =================================================================
+    # =====================================================
     # ITEMS TABLE
-    # =================================================================
-    header = ["No", "Item Description", "Qty", "Price", "VAT", "Total"]
+    # =====================================================
+    header = [
+        t("pdf_col_no", lang),
+        t("pdf_col_item", lang),
+        t("pdf_col_qty", lang),
+        t("pdf_col_price", lang),
+        t("pdf_col_vat", lang),
+        t("pdf_col_total", lang),
+    ]
     rows = [header]
 
     for idx, item in enumerate(quote_data["items"], start=1):
         line_total = (item["base"] + item["vat"]) * item["qty"]
+        # Replace English "Installation CCTV" with localized version
+        name = item["name"]
+        if name == "Installation CCTV":
+            name = t("installation_label", lang)
         rows.append([
             str(idx),
-            item["name"][:60] + ("..." if len(item["name"]) > 60 else ""),
+            name[:60] + ("..." if len(name) > 60 else ""),
             str(item["qty"]),
             f"£{item['base']:.2f}",
             f"£{item['vat']:.2f}",
@@ -212,22 +235,19 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
         colWidths=[12 * mm, 85 * mm, 15 * mm, 25 * mm, 22 * mm, 25 * mm],
     )
     items_table.setStyle(TableStyle([
-        # Header row
         ("BACKGROUND", (0, 0), (-1, 0), LIGHT_GREY),
         ("TEXTCOLOR", (0, 0), (-1, 0), MID_GREY),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), FONT_NAME_BOLD),
         ("FONTSIZE", (0, 0), (-1, 0), 10),
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-        # Body rows
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTNAME", (0, 1), (-1, -1), FONT_NAME),
         ("FONTSIZE", (0, 1), (-1, -1), 9),
         ("TEXTCOLOR", (0, 1), (-1, -1), DARK_TEXT),
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),       # No column
-        ("ALIGN", (2, 1), (2, -1), "CENTER"),        # Qty
-        ("ALIGN", (3, 1), (-1, -1), "RIGHT"),        # Money columns
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),
+        ("ALIGN", (2, 1), (2, -1), "CENTER"),
+        ("ALIGN", (3, 1), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, colors.HexColor("#FAFAFA")]),
-        # Padding
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
@@ -236,31 +256,31 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
     story.append(items_table)
     story.append(Spacer(1, 8 * mm))
 
-    # =================================================================
-    # PAYMENT INFO + TOTALS (two columns)
-    # =================================================================
+    # =====================================================
+    # Payment + Totals
+    # =====================================================
     payment_text = (
-        "<b>Payment details:</b> Lloyds Bank<br/>"
-        "<b>Account number:</b> 48253368<br/>"
-        "<b>Sort code:</b> 30-99-50<br/>"
-        "<b>IBAN:</b> GB38LOYD30995048253368<br/>"
-        "<b>BIC:</b> LOYDGB21287<br/>"
-        "<b>VAT:</b> 455026800"
+        f"<b>{t('pdf_payment_details', lang)}</b> Lloyds Bank<br/>"
+        f"<b>{t('pdf_account_number', lang)}</b> 48253368<br/>"
+        f"<b>{t('pdf_sort_code', lang)}</b> 30-99-50<br/>"
+        f"<b>IBAN:</b> GB38LOYD30995048253368<br/>"
+        f"<b>BIC:</b> LOYDGB21287<br/>"
+        f"<b>VAT:</b> 455026800"
     )
     payment_para = Paragraph(payment_text, s_normal)
 
     totals_rows = [
-        ["Subtotal", f"£{quote_data['subtotal']:.2f}"],
-        ["Discount", f"£{quote_data.get('discount', 0):.2f}"],
-        ["Total VAT", f"£{quote_data['vat_total']:.2f}"],
+        [t("pdf_subtotal", lang), f"£{quote_data['subtotal']:.2f}"],
+        [t("pdf_discount", lang), f"£{quote_data.get('discount', 0):.2f}"],
+        [t("pdf_total_vat", lang), f"£{quote_data['vat_total']:.2f}"],
         ["", ""],
-        ["Grand total", f"{quote_data['grand_total']:.2f} GBP"],
+        [t("pdf_grand_total", lang), f"{quote_data['grand_total']:.2f} GBP"],
     ]
     totals_table = Table(totals_rows, colWidths=[40 * mm, 35 * mm])
     totals_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -2), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, -2), FONT_NAME_BOLD),
         ("FONTSIZE", (0, 0), (-1, -2), 11),
-        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), FONT_NAME_BOLD),
         ("FONTSIZE", (0, -1), (-1, -1), 12),
         ("TEXTCOLOR", (0, -1), (-1, -1), MID_GREY),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
@@ -274,37 +294,28 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
         [[payment_para, totals_table]],
         colWidths=[100 * mm, 75 * mm],
     )
-    bottom_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
+    bottom_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(bottom_table)
     story.append(Spacer(1, 12 * mm))
 
-    # =================================================================
-    # TERMS & CONDITIONS
-    # =================================================================
-    story.append(Paragraph("<b>TERMS &amp; CONDITIONS</b>",
-                           ParagraphStyle("t", parent=s_bold, fontSize=11, leading=14)))
+    # =====================================================
+    # Terms
+    # =====================================================
+    story.append(Paragraph(f"<b>{t('pdf_terms_title', lang)}</b>",
+                           ParagraphStyle("t", fontName=FONT_NAME_BOLD, fontSize=11, leading=14)))
     story.append(Spacer(1, 2 * mm))
-    terms = [
-        "1. Prices are valid for 1 week",
-        "2. Equipment delivery time is from 5-7 working days",
-        "3. Work completion time is from 3 to 5 days",
-    ]
-    for t in terms:
-        story.append(Paragraph(t, s_normal))
+    for term_key in ("pdf_term_1", "pdf_term_2", "pdf_term_3"):
+        story.append(Paragraph(t(term_key, lang), s_normal))
 
     story.append(Spacer(1, 10 * mm))
 
-    # Contact line
     contact = Paragraph(
         '<font color="#FCA311"><b>📞</b></font> <b>+44 7706 906079</b> &nbsp;&nbsp;&nbsp;'
         '<font color="#FCA311"><b>✉</b></font> <b>r.brain@spetstech.co.uk</b>',
-        ParagraphStyle("c", parent=s_normal, fontSize=11, leading=14)
+        ParagraphStyle("c", fontName=FONT_NAME, fontSize=11, leading=14)
     )
     story.append(contact)
 
-    # Build PDF
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
 
     pdf_bytes = buf.getvalue()
@@ -318,17 +329,19 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
 if __name__ == "__main__":
     from pricing import build_quote
 
-    quote = build_quote(camera_count=6, camera_tier="premium", archive_choice="2_weeks")
-    quote["quote_number"] = "TEST-001"
-    quote["date"] = datetime.now()
-    quote["customer"] = {
-        "name": "John Smith",
-        "phone": "+44 7700 900123",
-        "email": "john.smith@example.com",
-        "address": "10 Downing St, London, SW1A 2AA",
-    }
+    for lang in ("en", "ru", "uk"):
+        quote = build_quote(camera_count=6, camera_tier="premium", archive_choice="2_weeks")
+        quote["quote_number"] = f"TEST-{lang}"
+        quote["date"] = datetime.now()
+        quote["customer"] = {
+            "name": {"en": "John Smith", "ru": "Иван Иванов", "uk": "Іван Іваненко"}[lang],
+            "phone": "+44 7700 900123",
+            "email": "test@example.com",
+            "address": "10 Downing St, London",
+        }
+        quote["lang"] = lang
 
-    pdf_bytes = generate_quote_pdf(quote)
-    with open("/tmp/test_quote.pdf", "wb") as f:
-        f.write(pdf_bytes)
-    print(f"PDF generated: /tmp/test_quote.pdf ({len(pdf_bytes)} bytes)")
+        pdf_bytes = generate_quote_pdf(quote)
+        with open(f"/tmp/test_quote_{lang}.pdf", "wb") as f:
+            f.write(pdf_bytes)
+        print(f"PDF {lang}: /tmp/test_quote_{lang}.pdf ({len(pdf_bytes)} bytes)")

@@ -1,8 +1,5 @@
 """
-SPETS SECURITY — Email sender via Resend
-Why Resend: Railway blocks outbound SMTP ports, so we use Resend's HTTPS API.
-Free tier: 100 emails/day, 3,000/month — generous and permanent.
-Docs: https://resend.com/docs/api-reference/emails/send-email
+SPETS SECURITY — Email sender via Resend (multilingual)
 """
 import os
 import base64
@@ -11,11 +8,12 @@ from typing import Optional
 
 import requests
 
+from translations import t
+
 log = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
-# Env config
 FROM_EMAIL = os.getenv("SENDER_EMAIL", "onboarding@resend.dev")
 FROM_NAME = os.getenv("SENDER_NAME", "Spets Security LTD")
 REPLY_TO_EMAIL = os.getenv("REPLY_TO_EMAIL", "r.brain@spetstech.co.uk")
@@ -29,11 +27,9 @@ def send_quote_email(
     grand_total: float,
     pdf_bytes: bytes,
     pdf_filename: Optional[str] = None,
+    lang: str = "en",
 ) -> bool:
-    """
-    Send quote PDF to customer via Resend.
-    Returns True on success, False on failure (and logs the reason).
-    """
+    """Send quote PDF to customer via Resend, in the chosen language."""
     if not RESEND_API_KEY:
         log.error("RESEND_API_KEY is not set in environment")
         return False
@@ -41,10 +37,9 @@ def send_quote_email(
     if pdf_filename is None:
         pdf_filename = f"Quote-{quote_number}.pdf"
 
-    # Resend expects attachments as base64-encoded strings
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
 
-    subject = f"Your CCTV Quote #{quote_number} — Spets Security LTD"
+    subject = t("email_subject", lang, n=quote_number)
 
     html_body = f"""
     <!DOCTYPE html>
@@ -58,34 +53,34 @@ def send_quote_email(
         </div>
 
         <div style="padding: 30px 20px;">
-          <p>Hello {customer_name},</p>
+          <p>{t("email_hello", lang, name=customer_name)}</p>
 
-          <p>Thank you for your interest in Spets Security CCTV solutions.</p>
+          <p>{t("email_intro", lang)}</p>
 
-          <p>Please find your personalised quote <strong>#{quote_number}</strong> attached as a PDF.</p>
+          <p>{t("email_find_pdf", lang, n=quote_number)}</p>
 
           <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
             <tr>
               <td style="padding: 12px; background: #F0F4F8; border-left: 4px solid #FCA311;">
-                <strong>Quote Total:</strong> £{grand_total:,.2f} (incl. VAT)
+                <strong>{t("email_total_label", lang)}</strong> £{grand_total:,.2f} {t("email_incl_vat", lang)}
               </td>
             </tr>
           </table>
 
-          <p><strong>Quote is valid for 7 days.</strong></p>
+          <p>{t("email_valid_7days", lang)}</p>
 
-          <p>What happens next:</p>
+          <p>{t("email_next_title", lang)}</p>
           <ul>
-            <li>Review the quote at your convenience</li>
-            <li>Reply to this email or call us with any questions</li>
-            <li>Equipment delivery: 5-7 working days from order</li>
-            <li>Installation: 3-5 days after equipment arrives</li>
+            <li>{t("email_next_1", lang)}</li>
+            <li>{t("email_next_2", lang)}</li>
+            <li>{t("email_next_3", lang)}</li>
+            <li>{t("email_next_4", lang)}</li>
           </ul>
 
-          <p>If you have any questions, just reply to this email or call us directly.</p>
+          <p>{t("email_questions", lang)}</p>
 
           <p style="margin-top: 30px;">
-            Best regards,<br>
+            {t("email_best_regards", lang)}<br>
             <strong>Spets Security LTD</strong>
           </p>
         </div>
@@ -123,7 +118,7 @@ def send_quote_email(
         response = requests.post(RESEND_API_URL, json=payload, headers=headers, timeout=30)
         if 200 <= response.status_code < 300:
             email_id = response.json().get("id", "?")
-            log.info(f"Email sent to {to_email} (quote #{quote_number}, resend id={email_id})")
+            log.info(f"Email sent to {to_email} (quote #{quote_number}, lang={lang}, resend id={email_id})")
             return True
         else:
             log.error(f"Resend error {response.status_code}: {response.text}")
@@ -143,10 +138,7 @@ def send_admin_notification(
     grand_total: float,
     keycrm_url: Optional[str] = None,
 ) -> bool:
-    """
-    Send Telegram notification to admin (you) when new quote is created.
-    Uses Telegram Bot API directly — no email service needed for this.
-    """
+    """Notify admin in Telegram — always in English so manager understands."""
     text = (
         f"🆕 *New CCTV Quote #{quote_number}*\n\n"
         f"👤 *Client:* {customer_name}\n"
