@@ -210,7 +210,34 @@ def generate_quote_pdf(quote_data: dict) -> bytes:
     )
     inv_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     story.append(inv_table)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Spacer(1, 6 * mm))
+
+    # =====================================================
+    # PACKAGE BADGE (coloured banner: Budget/Balance/Elite)
+    # =====================================================
+    pkg_label = quote_data.get("package_label", "")
+    pkg_color_hex = quote_data.get("package_color", "")
+    if pkg_label and pkg_color_hex:
+        try:
+            pkg_color = colors.HexColor(pkg_color_hex)
+        except Exception:
+            pkg_color = NAVY
+
+        badge_table = Table(
+            [[Paragraph(
+                f'<font color="white"><b>{pkg_label.upper()} PACKAGE</b></font>',
+                ParagraphStyle("badge", fontName=FONT_NAME_BOLD, fontSize=14,
+                               alignment=1, textColor=colors.white, leading=18)
+            )]],
+            colWidths=[180 * mm],
+        )
+        badge_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), pkg_color),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(badge_table)
+        story.append(Spacer(1, 6 * mm))
 
     # =====================================================
     # ITEMS TABLE

@@ -117,20 +117,15 @@ def create_order(
     grand_total: float,
     customer_address: str = "",
     lang: str = "en",
+    job_reference: Optional[str] = None,
 ) -> Optional[int]:
     """
     Create an order in KeyCRM linked to a buyer.
-
-    quote_items = [
-        {"name": "...", "sku": "...", "qty": 1, "base": 141.45, "vat": 28.29, ...},
-        ...
-    ]
     Returns order_id on success, None on failure.
     """
     # Build products list
     products = []
     for item in quote_items:
-        # KeyCRM expects unit price WITH VAT, qty, sku, name
         unit_price_with_vat = item["base"] + item["vat"]
         products.append({
             "name": item["name"],
@@ -147,7 +142,7 @@ def create_order(
         "products": products,
         "grand_total": round(grand_total, 2),
         "custom_fields": [
-            {"uuid": OR_JOB_REF, "value": f"Quote-{quote_number}"},
+            {"uuid": OR_JOB_REF, "value": job_reference or f"Quote-{quote_number}"},
         ],
     }
 
@@ -179,10 +174,11 @@ def push_quote_to_keycrm(quote_data: dict) -> dict:
     quote_data structure (from bot.py):
     {
         "customer": {"name", "phone", "email", "address", "object_type"},
-        "items": [...],
-        "grand_total": ...,
+        "items": [...],            # items from the Balance package (middle option)
+        "grand_total": ...,        # Balance package total
         "quote_number": "201",
         "lang": "uk",
+        "all_packages": {"budget": 1317.54, "balance": 1959.92, "elite": 2332.52},
     }
 
     Returns:
@@ -199,20 +195,33 @@ def push_quote_to_keycrm(quote_data: dict) -> dict:
 
     customer = quote_data["customer"]
     lang = quote_data.get("lang", "en")
+    all_packages = quote_data.get("all_packages", {})
 
     # 1) Create buyer
     buyer_id = create_buyer(customer, lang=lang)
     if not buyer_id:
         return {"ok": False, "error": "buyer creation failed"}
 
-    # 2) Create order
+    # 2) Create order with all 3 packages info in job_reference
+    qn = quote_data["quote_number"]
+    if all_packages:
+        job_ref = (
+            f"Quote-{qn} | "
+            f"Budget £{all_packages.get('budget', 0):.2f} | "
+            f"Balance £{all_packages.get('balance', 0):.2f} | "
+            f"Elite £{all_packages.get('elite', 0):.2f}"
+        )
+    else:
+        job_ref = f"Quote-{qn}"
+
     order_id = create_order(
         buyer_id=buyer_id,
-        quote_number=quote_data["quote_number"],
+        quote_number=qn,
         quote_items=quote_data["items"],
         grand_total=quote_data["grand_total"],
         customer_address=customer.get("address", ""),
         lang=lang,
+        job_reference=job_ref,
     )
     if not order_id:
         return {"ok": False, "buyer_id": buyer_id, "error": "order creation failed"}

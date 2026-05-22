@@ -70,15 +70,18 @@ TRANSLATIONS = {
         "uk": "📍 *Адреса встановлення*?\n(Вулиця, місто, індекс)",
     },
     "ask_object_type": {
-        "en": "🏢 What *type of object* needs CCTV?",
-        "ru": "🏢 Какой *тип объекта* нуждается в CCTV?",
-        "uk": "🏢 Який *тип обʼєкта* потребує CCTV?",
+        "en": "🏠 What *type of object* is this for?",
+        "ru": "🏠 *Тип объекта*?",
+        "uk": "🏠 *Тип обʼєкта*?",
     },
-    "object_house": {"en": "🏠 House", "ru": "🏠 Дом", "uk": "🏠 Будинок"},
-    "object_office": {"en": "🏢 Office", "ru": "🏢 Офис", "uk": "🏢 Офіс"},
-    "object_shop": {"en": "🏪 Shop", "ru": "🏪 Магазин", "uk": "🏪 Магазин"},
-    "object_warehouse": {"en": "🏭 Warehouse", "ru": "🏭 Склад", "uk": "🏭 Склад"},
-    "object_other": {"en": "📦 Other", "ru": "📦 Другое", "uk": "📦 Інше"},
+    "object_home": {"en": "🏠 Home", "ru": "🏠 Дом / квартира", "uk": "🏠 Дім / квартира"},
+    "object_business": {"en": "🏢 Business", "ru": "🏢 Бизнес (офис, склад, магазин)", "uk": "🏢 Бізнес (офіс, склад, магазин)"},
+    # Legacy keys (kept for backward compat in case any code still uses them)
+    "object_house": {"en": "🏠 Home", "ru": "🏠 Дом", "uk": "🏠 Дім"},
+    "object_office": {"en": "🏢 Business", "ru": "🏢 Бизнес", "uk": "🏢 Бізнес"},
+    "object_shop": {"en": "🏢 Business", "ru": "🏢 Бизнес", "uk": "🏢 Бізнес"},
+    "object_warehouse": {"en": "🏢 Business", "ru": "🏢 Бизнес", "uk": "🏢 Бізнес"},
+    "object_other": {"en": "🏢 Business", "ru": "🏢 Бизнес", "uk": "🏢 Бізнес"},
 
     "ask_camera_count": {
         "en": "📹 How many *cameras* do you need?\n(Just type a number, e.g. 4)",
@@ -97,43 +100,6 @@ TRANSLATIONS = {
               "Для бо́льших проектов звоните +44 7706 906079.",
         "uk": "Зараз автоматично розраховуємо 1–16 камер. "
               "Для більших проектів телефонуйте +44 7706 906079.",
-    },
-    "ask_camera_tier": {
-        "en": "📸 Which *camera tier* would you like?\n\n"
-              "🟢 *Basic* — IR night vision\n"
-              "🔵 *Standard* — Colour at night (ColorVu)\n"
-              "🟠 *Premium* — ColorVu 3.0 + mic/speaker\n"
-              "🔴 *Premium 4K* — 8MP top tier",
-        "ru": "📸 Какой *уровень камер* вы хотите?\n\n"
-              "🟢 *Базовый* — Ночное видение (IR)\n"
-              "🔵 *Стандарт* — Цветное ночью (ColorVu)\n"
-              "🟠 *Премиум* — ColorVu 3.0 + микрофон/динамик\n"
-              "🔴 *Премиум 4K* — 8MP топовый",
-        "uk": "📸 Який *рівень камер* ви бажаєте?\n\n"
-              "🟢 *Базовий* — Нічне бачення (IR)\n"
-              "🔵 *Стандарт* — Кольорове вночі (ColorVu)\n"
-              "🟠 *Преміум* — ColorVu 3.0 + мікрофон/динамік\n"
-              "🔴 *Преміум 4K* — 8MP топовий",
-    },
-    "tier_basic_btn": {
-        "en": "🟢 Basic — HiLook 5MP IR (£50.60)",
-        "ru": "🟢 Базовый — HiLook 5MP IR (£50.60)",
-        "uk": "🟢 Базовий — HiLook 5MP IR (£50.60)",
-    },
-    "tier_standard_btn": {
-        "en": "🔵 Standard — HiLook 4MP ColorVu (£60.95)",
-        "ru": "🔵 Стандарт — HiLook 4MP ColorVu (£60.95)",
-        "uk": "🔵 Стандарт — HiLook 4MP ColorVu (£60.95)",
-    },
-    "tier_premium_btn": {
-        "en": "🟠 Premium — Hikvision 4MP ColorVu 3.0 (£141.45)",
-        "ru": "🟠 Премиум — Hikvision 4MP ColorVu 3.0 (£141.45)",
-        "uk": "🟠 Преміум — Hikvision 4MP ColorVu 3.0 (£141.45)",
-    },
-    "tier_4k_btn": {
-        "en": "🔴 Premium 4K — Hikvision 8MP 4K (£193.20)",
-        "ru": "🔴 Премиум 4K — Hikvision 8MP 4K (£193.20)",
-        "uk": "🔴 Преміум 4K — Hikvision 8MP 4K (£193.20)",
     },
     "ask_archive": {
         "en": "💾 How long do you want to *keep video archive*?",
@@ -162,12 +128,66 @@ TRANSLATIONS = {
     },
 
     # ============================================================
-    # QUOTE SUMMARY
+    # GDPR CONSENT
+    # ============================================================
+    "gdpr_prompt": {
+        "en": "📋 Before I send your quote — by continuing, you agree that "
+              "*Spets Security LTD* may process your personal data (name, "
+              "phone, email, address) to send this quote and contact you "
+              "about CCTV services.\n\n"
+              "To delete your data anytime, email: spets.services@gmail.com",
+        "ru": "📋 Перед отправкой предложения — продолжая, вы соглашаетесь, "
+              "что *Spets Security LTD* может обрабатывать ваши данные "
+              "(имя, телефон, email, адрес) для отправки предложения и "
+              "связи по услугам CCTV.\n\n"
+              "Для удаления данных в любой момент: spets.services@gmail.com",
+        "uk": "📋 Перед відправкою пропозиції — продовжуючи, ви погоджуєтесь, "
+              "що *Spets Security LTD* може обробляти ваші дані (імʼя, "
+              "телефон, email, адреса) для надсилання пропозиції та "
+              "звʼязку з вами щодо послуг CCTV.\n\n"
+              "Для видалення даних будь-коли: spets.services@gmail.com",
+    },
+    "gdpr_agree_btn": {
+        "en": "✅ I agree",
+        "ru": "✅ Я согласен",
+        "uk": "✅ Я погоджуюсь",
+    },
+    "gdpr_decline_btn": {
+        "en": "❌ Cancel",
+        "ru": "❌ Отмена",
+        "uk": "❌ Скасувати",
+    },
+
+    # ============================================================
+    # QUOTE SUMMARY (3 packages comparison)
     # ============================================================
     "quote_summary_header": {
-        "en": "📋 *Quote Summary:*\n",
-        "ru": "📋 *Сводка предложения:*\n",
-        "uk": "📋 *Підсумок пропозиції:*\n",
+        "en": "📋 *We've prepared 3 packages for you:*\n",
+        "ru": "📋 *Мы подготовили для вас 3 пакета:*\n",
+        "uk": "📋 *Ми підготували для вас 3 пакети:*\n",
+    },
+    "package_budget":  {"en": "🟢 *Budget*",  "ru": "🟢 *Budget*",  "uk": "🟢 *Budget*"},
+    "package_balance": {"en": "🔵 *Balance*", "ru": "🔵 *Balance*", "uk": "🔵 *Balance*"},
+    "package_elite":   {"en": "🟡 *Elite*",   "ru": "🟡 *Elite*",   "uk": "🟡 *Elite*"},
+    "package_budget_desc": {
+        "en": "HiLook 4MP ColorVu cameras + HiLook NVR",
+        "ru": "Камеры HiLook 4MP ColorVu + HiLook NVR",
+        "uk": "Камери HiLook 4MP ColorVu + HiLook NVR",
+    },
+    "package_balance_desc": {
+        "en": "Hikvision 4MP ColorVu 3.0 + AcuSense NVR",
+        "ru": "Hikvision 4MP ColorVu 3.0 + AcuSense NVR",
+        "uk": "Hikvision 4MP ColorVu 3.0 + AcuSense NVR",
+    },
+    "package_elite_desc": {
+        "en": "Hikvision 4K 8MP ColorVu 3.0 + AcuSense NVR",
+        "ru": "Hikvision 4K 8MP ColorVu 3.0 + AcuSense NVR",
+        "uk": "Hikvision 4K 8MP ColorVu 3.0 + AcuSense NVR",
+    },
+    "total_label": {
+        "en": "Total (incl. VAT)",
+        "ru": "Итого (с НДС)",
+        "uk": "Разом (з ПДВ)",
     },
     "subtotal": {"en": "💷 *Subtotal:*", "ru": "💷 *Подытог:*", "uk": "💷 *Сума:*"},
     "vat_label": {"en": "💷 *VAT 20%:*", "ru": "💷 *НДС 20%:*", "uk": "💷 *ПДВ 20%:*"},
@@ -177,9 +197,9 @@ TRANSLATIONS = {
         "uk": "💷 *РАЗОМ:*",
     },
     "send_pdf_btn": {
-        "en": "✅ Send PDF to my email",
-        "ru": "✅ Отправить PDF на мой email",
-        "uk": "✅ Надіслати PDF на мою пошту",
+        "en": "✅ Send PDF quotes to email",
+        "ru": "✅ Отправить PDF на email",
+        "uk": "✅ Надіслати PDF на пошту",
     },
     "cancel_btn": {"en": "❌ Cancel", "ru": "❌ Отмена", "uk": "❌ Скасувати"},
 
@@ -187,38 +207,47 @@ TRANSLATIONS = {
     # CONFIRMATION
     # ============================================================
     "generating_pdf": {
-        "en": "⏳ Generating your quote PDF...",
-        "ru": "⏳ Генерирую ваше PDF-предложение...",
-        "uk": "⏳ Генерую вашу PDF-пропозицію...",
+        "en": "⏳ Generating your quote PDFs...",
+        "ru": "⏳ Генерирую ваши PDF-предложения...",
+        "uk": "⏳ Генерую ваші PDF-пропозиції...",
     },
+    "pdf_caption_budget":  {"en": "🟢 Budget package",  "ru": "🟢 Пакет Budget",  "uk": "🟢 Пакет Budget"},
+    "pdf_caption_balance": {"en": "🔵 Balance package", "ru": "🔵 Пакет Balance", "uk": "🔵 Пакет Balance"},
+    "pdf_caption_elite":   {"en": "🟡 Elite package",   "ru": "🟡 Пакет Elite",   "uk": "🟡 Пакет Elite"},
     "pdf_caption": {
         "en": "📄 Your quote #{n}",
         "ru": "📄 Ваше предложение #{n}",
         "uk": "📄 Ваша пропозиція #{n}",
     },
     "quote_sent_ok": {
-        "en": "✅ *Quote #{n} sent!*\n\n"
-              "📧 PDF emailed to: {email}\n"
-              "💷 Total: £{total:.2f}\n\n"
-              "We'll be in touch within 24 hours.\n"
-              "Quote is valid for *7 days*.",
-        "ru": "✅ *Предложение #{n} отправлено!*\n\n"
-              "📧 PDF отправлен на: {email}\n"
-              "💷 Итого: £{total:.2f}\n\n"
-              "Мы свяжемся с вами в течение 24 часов.\n"
-              "Предложение действительно *7 дней*.",
-        "uk": "✅ *Пропозицію #{n} надіслано!*\n\n"
-              "📧 PDF надіслано на: {email}\n"
-              "💷 Разом: £{total:.2f}\n\n"
-              "Ми звʼяжемося з вами протягом 24 годин.\n"
-              "Пропозиція дійсна *7 днів*.",
+        "en": "✅ *Your 3 quote options sent!*\n\n"
+              "📧 PDFs emailed to: {email}\n\n"
+              "🟢 *Budget:* £{budget:.2f}\n"
+              "🔵 *Balance:* £{balance:.2f}\n"
+              "🟡 *Elite:* £{elite:.2f}\n\n"
+              "Our team will contact you within 24 hours.\n"
+              "Quotes are valid for *7 days*.",
+        "ru": "✅ *Ваши 3 предложения отправлены!*\n\n"
+              "📧 PDF отправлены на: {email}\n\n"
+              "🟢 *Budget:* £{budget:.2f}\n"
+              "🔵 *Balance:* £{balance:.2f}\n"
+              "🟡 *Elite:* £{elite:.2f}\n\n"
+              "Наша команда свяжется с вами в течение 24 часов.\n"
+              "Предложения действительны *7 дней*.",
+        "uk": "✅ *Ваші 3 пропозиції надіслано!*\n\n"
+              "📧 PDF надіслано на: {email}\n\n"
+              "🟢 *Budget:* £{budget:.2f}\n"
+              "🔵 *Balance:* £{balance:.2f}\n"
+              "🟡 *Elite:* £{elite:.2f}\n\n"
+              "Наша команда звʼяжеться з вами протягом 24 годин.\n"
+              "Пропозиції дійсні *7 днів*.",
     },
     "quote_sent_email_failed": {
-        "en": "⚠️ Quote #{n} generated, but email delivery failed.\n"
-              "We have your PDF here in chat. A manager will contact you shortly.",
-        "ru": "⚠️ Предложение #{n} создано, но email не доставлен.\n"
+        "en": "⚠️ Quotes #{n} generated, but email delivery failed.\n"
+              "We have your PDFs here in chat. A manager will contact you shortly.",
+        "ru": "⚠️ Предложения #{n} созданы, но email не доставлен.\n"
               "PDF выше в чате. Менеджер свяжется с вами в ближайшее время.",
-        "uk": "⚠️ Пропозицію #{n} створено, але email не доставлено.\n"
+        "uk": "⚠️ Пропозиції #{n} створено, але email не доставлено.\n"
               "PDF вище в чаті. Менеджер звʼяжеться з вами найближчим часом.",
     },
     "cancelled": {
@@ -227,7 +256,7 @@ TRANSLATIONS = {
         "uk": "❌ Скасовано. Напишіть /start щоб почати знову.",
     },
     "pdf_error": {
-        "en": "⚠️ Sorry, something went wrong while generating PDF. Please call +44 7706 906079.",
+        "en": "⚠️ Sorry, something went wrong while generating PDFs. Please call +44 7706 906079.",
         "ru": "⚠️ Извините, ошибка при создании PDF. Звоните +44 7706 906079.",
         "uk": "⚠️ Вибачте, помилка при створенні PDF. Телефонуйте +44 7706 906079.",
     },

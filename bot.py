@@ -1,11 +1,10 @@
 """
-SPETS SECURITY — Telegram bot for CCTV quote generation (multilingual EN/RU/UK)
-Python 3.10+ | python-telegram-bot 20.7
+SPETS SECURITY — Telegram bot (3-package quote)
 
 Flow:
-1. /start → language selection
-2. Welcome → 8 questions
-3. Build quote → confirm → generate PDF → email → notify admin
+  /start → English by default (use /language to switch)
+  Name → Phone → Email → Address → Type (Home/Business) →
+  Cameras → Archive → GDPR consent → Send 3 PDFs (Budget/Balance/Elite)
 """
 import os
 import re
@@ -18,9 +17,9 @@ from telegram.ext import (
     ConversationHandler, ContextTypes, filters
 )
 
-from pricing import build_quote
+from pricing import build_all_packages, PACKAGE_META
 from quote_generator import generate_quote_pdf
-from email_sender import send_quote_email, send_admin_notification
+from email_sender import send_3_packages_email, send_admin_notification
 from translations import t
 from keycrm import push_quote_to_keycrm
 
@@ -35,12 +34,11 @@ log = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
-
 QUOTE_COUNTER_FILE = "/tmp/spets_quote_counter.txt"
 
-# Conversation states
+# States
 (LANGUAGE, NAME, PHONE, EMAIL, ADDRESS, OBJECT_TYPE,
- CAMERA_COUNT, CAMERA_TIER, ARCHIVE, CONFIRM) = range(10)
+ CAMERA_COUNT, ARCHIVE, GDPR) = range(9)
 
 
 # =====================================================================
@@ -72,30 +70,27 @@ def get_lang(context: ContextTypes.DEFAULT_TYPE) -> str:
 
 
 # =====================================================================
-# COMMAND HANDLERS
+# HANDLERS
 # =====================================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Entry point — first ask language."""
+    """Entry — English by default, no language picker at start."""
     user = update.effective_user
     context.user_data.clear()
     context.user_data["telegram_user_id"] = user.id
     context.user_data["telegram_username"] = user.username or ""
     context.user_data["first_name"] = user.first_name or ""
+    context.user_data["lang"] = "en"  # default
 
-    kb = [
-        [InlineKeyboardButton("English", callback_data="lang:en")],
-        [InlineKeyboardButton("Русский", callback_data="lang:ru")],
-        [InlineKeyboardButton("Українська", callback_data="lang:uk")],
-    ]
     await update.message.reply_text(
-        t("language_prompt", "en"),
-        reply_markup=InlineKeyboardMarkup(kb),
+        t("welcome", "en", name=user.first_name or "there"),
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardRemove(),
     )
-    return LANGUAGE
+    return NAME
 
 
 async def change_language_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """/language command — change language anytime."""
+    """/language — switch language anytime."""
     kb = [
         [InlineKeyboardButton("English", callback_data="lang:en")],
         [InlineKeyboardButton("Русский", callback_data="lang:ru")],
@@ -105,29 +100,30 @@ async def change_language_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
         t("language_prompt", "en"),
         reply_markup=InlineKeyboardMarkup(kb),
     )
-    # If user was mid-conversation, restart it
     return LANGUAGE
 
 
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Process language selection."""
+    """Process language pick from /language command."""
     query = update.callback_query
     await query.answer()
     lang = query.data.replace("lang:", "")
     context.user_data["lang"] = lang
 
-    first_name = context.user_data.get("first_name", "")
+    await query.edit_message_text(t("language_set", lang))
 
-    await query.edit_message_text(
-        t("language_set", lang)
-    )
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=t("welcome", lang, name=first_name),
-        parse_mode="Markdown",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    return NAME
+    # If conversation just started (no name yet) — go to NAME, else stay
+    if not context.user_data.get("name"):
+        first_name = context.user_data.get("first_name", "")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=t("welcome", lang, name=first_name),
+            parse_mode="Markdown",
+        )
+        return NAME
+
+    # If mid-flow, just confirm and end (user can /start again)
+    return ConversationHandler.END
 
 
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -174,11 +170,7 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     context.user_data["address"] = update.message.text.strip()
 
     keyboard = ReplyKeyboardMarkup(
-        [
-            [t("object_house", lang), t("object_office", lang)],
-            [t("object_shop", lang), t("object_warehouse", lang)],
-            [t("object_other", lang)],
-        ],
+        [[t("object_home", lang)], [t("object_business", lang)]],
         one_time_keyboard=True, resize_keyboard=True,
     )
     await update.message.reply_text(
@@ -191,7 +183,14 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def get_object_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_lang(context)
-    context.user_data["object_type"] = update.message.text.strip()
+    text = update.message.text.strip()
+    # Normalize: if user typed something containing "home" or matches translation
+    if text == t("object_home", lang) or "home" in text.lower() or "дом" in text.lower() or "дім" in text.lower() or "квартир" in text.lower():
+        obj_type = "Home"
+    else:
+        obj_type = "Business"
+    context.user_data["object_type"] = obj_type
+
     await update.message.reply_text(
         t("ask_camera_count", lang),
         parse_mode="Markdown",
@@ -216,33 +215,12 @@ async def get_camera_count(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data["camera_count"] = n
 
     kb = [
-        [InlineKeyboardButton(t("tier_basic_btn", lang), callback_data="tier:basic")],
-        [InlineKeyboardButton(t("tier_standard_btn", lang), callback_data="tier:standard")],
-        [InlineKeyboardButton(t("tier_premium_btn", lang), callback_data="tier:premium")],
-        [InlineKeyboardButton(t("tier_4k_btn", lang), callback_data="tier:premium_4k")],
-    ]
-    await update.message.reply_text(
-        t("ask_camera_tier", lang),
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(kb),
-    )
-    return CAMERA_TIER
-
-
-async def get_camera_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    lang = get_lang(context)
-    query = update.callback_query
-    await query.answer()
-    tier = query.data.replace("tier:", "")
-    context.user_data["camera_tier"] = tier
-
-    kb = [
         [InlineKeyboardButton(t("arch_1week", lang), callback_data="arch:1_week")],
         [InlineKeyboardButton(t("arch_2weeks", lang), callback_data="arch:2_weeks")],
         [InlineKeyboardButton(t("arch_1month", lang), callback_data="arch:1_month")],
         [InlineKeyboardButton(t("arch_2months", lang), callback_data="arch:2_months")],
     ]
-    await query.edit_message_text(
+    await update.message.reply_text(
         t("ask_archive", lang),
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(kb),
@@ -257,88 +235,109 @@ async def get_archive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     archive = query.data.replace("arch:", "")
     context.user_data["archive"] = archive
 
-    data = context.user_data
-    quote = build_quote(
-        camera_count=data["camera_count"],
-        camera_tier=data["camera_tier"],
+    # Build all 3 packages
+    quotes = build_all_packages(
+        camera_count=context.user_data["camera_count"],
         archive_choice=archive,
     )
-    context.user_data["quote"] = quote
+    context.user_data["quotes"] = quotes
 
-    # Summary
+    # Comparison summary
     lines = [t("quote_summary_header", lang)]
-    for i, item in enumerate(quote["items"], 1):
-        line_total = (item["base"] + item["vat"]) * item["qty"]
-        lines.append(f"{i}. {item['name'][:45]}")
-        lines.append(f"   Qty: {item['qty']} × £{item['base']:.2f} = £{line_total:.2f}")
-    lines.append(f"\n{t('subtotal', lang)} £{quote['subtotal']:.2f}")
-    lines.append(f"{t('vat_label', lang)} £{quote['vat_total']:.2f}")
-    lines.append(f"{t('grand_total_label', lang)} *£{quote['grand_total']:.2f}*")
+    lines.append(f"\n{t('package_budget', lang)} — {t('package_budget_desc', lang)}")
+    lines.append(f"   *£{quotes['budget']['grand_total']:.2f}*")
+    lines.append(f"\n{t('package_balance', lang)} — {t('package_balance_desc', lang)}")
+    lines.append(f"   *£{quotes['balance']['grand_total']:.2f}*")
+    lines.append(f"\n{t('package_elite', lang)} — {t('package_elite_desc', lang)}")
+    lines.append(f"   *£{quotes['elite']['grand_total']:.2f}*")
+    lines.append("")
+    lines.append(t("gdpr_prompt", lang))
 
     kb = [
-        [InlineKeyboardButton(t("send_pdf_btn", lang), callback_data="confirm:yes")],
-        [InlineKeyboardButton(t("cancel_btn", lang), callback_data="confirm:no")],
+        [InlineKeyboardButton(t("gdpr_agree_btn", lang), callback_data="gdpr:yes")],
+        [InlineKeyboardButton(t("gdpr_decline_btn", lang), callback_data="gdpr:no")],
     ]
     await query.edit_message_text(
         "\n".join(lines),
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(kb),
     )
-    return CONFIRM
+    return GDPR
 
 
-async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def gdpr_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_lang(context)
     query = update.callback_query
     await query.answer()
 
-    if query.data == "confirm:no":
+    if query.data == "gdpr:no":
         await query.edit_message_text(t("cancelled", lang))
         context.user_data.clear()
         return ConversationHandler.END
 
+    # User agreed → generate and send
     await query.edit_message_text(t("generating_pdf", lang))
 
     data = context.user_data
-    quote = data["quote"]
-
+    quotes = data["quotes"]
     quote_number = next_quote_number()
-    quote_for_pdf = {
-        **quote,
-        "quote_number": quote_number,
-        "date": datetime.now(),
-        "customer": {
-            "name": data["name"],
-            "phone": data["phone"],
-            "email": data["email"],
-            "address": data.get("address", ""),
-            "object_type": data.get("object_type", ""),
-        },
-        "lang": lang,
+
+    customer = {
+        "name": data["name"],
+        "phone": data["phone"],
+        "email": data["email"],
+        "address": data.get("address", ""),
+        "object_type": data.get("object_type", ""),
     }
 
-    # Generate PDF
+    # Generate 3 PDFs
     try:
-        pdf_bytes = generate_quote_pdf(quote_for_pdf)
+        pdfs = {}
+        for pkg_id in ("budget", "balance", "elite"):
+            quote_for_pdf = {
+                **quotes[pkg_id],
+                "quote_number": quote_number,
+                "date": datetime.now(),
+                "customer": customer,
+                "lang": lang,
+            }
+            pdfs[pkg_id] = generate_quote_pdf(quote_for_pdf)
     except Exception as e:
         log.exception("PDF generation failed")
-        await query.edit_message_text(t("pdf_error", lang))
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=t("pdf_error", lang),
+        )
+        context.user_data.clear()
         return ConversationHandler.END
 
-    # Send to customer email (via Resend)
-    email_ok = send_quote_email(
+    # Send all 3 PDFs to customer email in one message
+    email_ok = send_3_packages_email(
         to_email=data["email"],
         customer_name=data["name"],
         quote_number=quote_number,
-        grand_total=quote["grand_total"],
-        pdf_bytes=pdf_bytes,
+        quotes=quotes,
+        pdfs=pdfs,
         lang=lang,
     )
 
-    # Push to KeyCRM (create Buyer + Order)
+    # Push to KeyCRM (one order with all 3 options summary)
     keycrm_url = None
     try:
-        crm_result = push_quote_to_keycrm(quote_for_pdf)
+        # Use balance as the "main" quote in KeyCRM, but add all 3 prices in job_reference
+        keycrm_data = {
+            "customer": customer,
+            "items": quotes["balance"]["items"],
+            "grand_total": quotes["balance"]["grand_total"],
+            "quote_number": quote_number,
+            "lang": lang,
+            "all_packages": {
+                "budget":  quotes["budget"]["grand_total"],
+                "balance": quotes["balance"]["grand_total"],
+                "elite":   quotes["elite"]["grand_total"],
+            },
+        }
+        crm_result = push_quote_to_keycrm(keycrm_data)
         if crm_result.get("ok"):
             keycrm_url = crm_result.get("url")
             log.info(f"KeyCRM push OK: order_id={crm_result.get('order_id')}")
@@ -347,18 +346,19 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     except Exception as e:
         log.exception(f"KeyCRM push exception: {e}")
 
-    # Also send PDF in chat
-    try:
-        await context.bot.send_document(
-            chat_id=update.effective_chat.id,
-            document=pdf_bytes,
-            filename=f"Spets-Quote-{quote_number}.pdf",
-            caption=t("pdf_caption", lang, n=quote_number),
-        )
-    except Exception as e:
-        log.error(f"Failed to send PDF in chat: {e}")
+    # Send all 3 PDFs in Telegram chat
+    for pkg_id, pdf_bytes in pdfs.items():
+        try:
+            await context.bot.send_document(
+                chat_id=update.effective_chat.id,
+                document=pdf_bytes,
+                filename=f"Spets-Quote-{quote_number}-{pkg_id.capitalize()}.pdf",
+                caption=t(f"pdf_caption_{pkg_id}", lang),
+            )
+        except Exception as e:
+            log.error(f"Failed to send PDF {pkg_id} in chat: {e}")
 
-    # Notify admin (always in English so manager understands regardless of client lang)
+    # Notify admin
     if ADMIN_CHAT_ID:
         send_admin_notification(
             admin_chat_id=ADMIN_CHAT_ID,
@@ -367,13 +367,27 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             customer_phone=data["phone"],
             customer_email=data["email"],
             quote_number=quote_number,
-            grand_total=quote["grand_total"],
+            grand_total=quotes["balance"]["grand_total"],
             keycrm_url=keycrm_url,
+            all_packages={
+                "budget":  quotes["budget"]["grand_total"],
+                "balance": quotes["balance"]["grand_total"],
+                "elite":   quotes["elite"]["grand_total"],
+            },
+            object_type=customer.get("object_type", ""),
+            camera_count=data.get("camera_count", 0),
         )
 
-    # Final message to customer
+    # Final message
     if email_ok:
-        msg = t("quote_sent_ok", lang, n=quote_number, email=data["email"], total=quote["grand_total"])
+        msg = t(
+            "quote_sent_ok", lang,
+            n=quote_number,
+            email=data["email"],
+            budget=quotes["budget"]["grand_total"],
+            balance=quotes["balance"]["grand_total"],
+            elite=quotes["elite"]["grand_total"],
+        )
     else:
         msg = t("quote_sent_email_failed", lang, n=quote_number)
 
@@ -417,16 +431,15 @@ def main():
             CommandHandler("language", change_language_cmd),
         ],
         states={
-            LANGUAGE:      [CallbackQueryHandler(set_language, pattern="^lang:")],
-            NAME:          [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
-            PHONE:         [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
-            EMAIL:         [MessageHandler(filters.TEXT & ~filters.COMMAND, get_email)],
-            ADDRESS:       [MessageHandler(filters.TEXT & ~filters.COMMAND, get_address)],
-            OBJECT_TYPE:   [MessageHandler(filters.TEXT & ~filters.COMMAND, get_object_type)],
-            CAMERA_COUNT:  [MessageHandler(filters.TEXT & ~filters.COMMAND, get_camera_count)],
-            CAMERA_TIER:   [CallbackQueryHandler(get_camera_tier, pattern="^tier:")],
-            ARCHIVE:       [CallbackQueryHandler(get_archive, pattern="^arch:")],
-            CONFIRM:       [CallbackQueryHandler(confirm, pattern="^confirm:")],
+            LANGUAGE:     [CallbackQueryHandler(set_language, pattern="^lang:")],
+            NAME:         [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
+            PHONE:        [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
+            EMAIL:        [MessageHandler(filters.TEXT & ~filters.COMMAND, get_email)],
+            ADDRESS:      [MessageHandler(filters.TEXT & ~filters.COMMAND, get_address)],
+            OBJECT_TYPE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, get_object_type)],
+            CAMERA_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_camera_count)],
+            ARCHIVE:      [CallbackQueryHandler(get_archive, pattern="^arch:")],
+            GDPR:         [CallbackQueryHandler(gdpr_response, pattern="^gdpr:")],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_chat=True,
