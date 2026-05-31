@@ -428,9 +428,12 @@ TRANSLATIONS = {
     },
 
     "contact_prompt": {
-        "en": "💬 *Type your message below* — our manager will reply within 24 hours.",
-        "ru": "💬 *Напишите ваше сообщение ниже* — менеджер ответит в течение 24 часов.",
-        "uk": "💬 *Напишіть ваше повідомлення нижче* — менеджер відповість протягом 24 годин.",
+        "en": "💬 Tap the button below to chat with our manager directly.\n"
+              "We'll reply as soon as possible!",
+        "ru": "💬 Нажмите кнопку ниже, чтобы написать менеджеру напрямую.\n"
+              "Мы ответим как можно скорее!",
+        "uk": "💬 Натисніть кнопку нижче, щоб написати менеджеру напряму.\n"
+              "Ми відповімо якнайшвидше!",
     },
     "message_sent": {
         "en": "✅ Thank you! Your message has been sent to our manager.\n"

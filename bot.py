@@ -40,6 +40,10 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
 QUOTE_COUNTER_FILE = "/tmp/spets_quote_counter.txt"
 
+# Support bot (connected to KeyCRM as a chat channel).
+# Customers tap "Message Manager" → open this bot → write → appears in KeyCRM chat.
+SUPPORT_BOT_URL = os.getenv("SUPPORT_BOT_URL", "https://t.me/SpetsSupport_bot")
+
 # States
 (LANGUAGE, NAME, PHONE, EMAIL, ADDRESS,
  SERVICE, OBJECT_TYPE, BUSINESS_TYPE,
@@ -228,8 +232,13 @@ async def handle_service(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return AFTER_QUOTE
 
     else:  # contact
-        await query.edit_message_text(t("contact_prompt", lang), parse_mode="Markdown")
-        return MESSAGE_MANAGER
+        kb = [[InlineKeyboardButton(t("btn_msg_manager", lang), url=SUPPORT_BOT_URL)]]
+        await query.edit_message_text(
+            t("contact_prompt", lang),
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(kb),
+        )
+        return ConversationHandler.END
 
 
 # =====================================================================
@@ -518,7 +527,7 @@ async def gdpr_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def _show_after_quote_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_lang(context)
     kb = [
-        [InlineKeyboardButton(t("btn_msg_manager", lang), callback_data="after:msg")],
+        [InlineKeyboardButton(t("btn_msg_manager", lang), url=SUPPORT_BOT_URL)],
         [InlineKeyboardButton(t("btn_back_main", lang), callback_data="after:main")],
     ]
     await context.bot.send_message(
@@ -535,10 +544,7 @@ async def handle_after_quote(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     choice = query.data.replace("after:", "")
 
-    if choice == "msg":
-        await query.edit_message_text(t("contact_prompt", lang), parse_mode="Markdown")
-        return MESSAGE_MANAGER
-
+    # "msg" no longer used (button is now a direct URL to support bot)
     # back to main → service menu (keep contacts)
     return await show_service_menu(update, context)
 
