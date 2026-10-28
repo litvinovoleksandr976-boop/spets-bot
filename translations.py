@@ -412,7 +412,7 @@ TRANSLATIONS = {
         "uk": "Яка послуга вас цікавить?",
     },
     "svc_cctv":    {"en": "🎥 CCTV Cameras",   "ru": "🎥 Камеры CCTV",   "uk": "🎥 Камери CCTV"},
-    "svc_alarm":   {"en": "🚨 Alarm System",   "ru": "🚨 Сигнализация",  "uk": "🚨 Сигналізація"},
+    "svc_alarm":   {"en": "🛡 Alarm — monthly subscription", "ru": "🛡 Сигнализация — подписка", "uk": "🛡 Сигналізація — підписка"},
     "svc_contact": {"en": "💬 Contact Manager","ru": "💬 Связаться с менеджером","uk": "💬 Звʼязатися з менеджером"},
 
     "alarm_coming_soon": {

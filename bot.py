@@ -36,6 +36,9 @@ from keycrm import push_quote_to_keycrm, get_next_quote_number, create_inquiry
 import ajax_flow
 from pricing_ajax import build_kit_quote, build_custom_quote
 from quote_generator_ajax import generate_ajax_quote_pdf
+import sub_flow
+import pricing_sub
+from quote_generator_sub import generate_subscription_pdf
 
 # =====================================================================
 # CONFIG
@@ -62,7 +65,12 @@ SUPPORT_BOT_URL = os.getenv("SUPPORT_BOT_URL", "https://t.me/SpetsSupport_bot")
  # --- Ajax alarm flow ---
  AJAX_MODE, AJAX_KIT, AJAX_HUB, AJAX_MOTION, AJAX_MOTIONCAM,
  AJAX_DOOR, AJAX_LEAK, AJAX_SMOKE, AJAX_SIREN, AJAX_KEYPAD,
- AJAX_KEYFOB, AJAX_REVIEW) = range(26)
+ AJAX_KEYFOB, AJAX_REVIEW,
+ # --- Alarm SUBSCRIPTION flow (new product) ---
+ SUB_LOC, SUB_HUB, SUB_EXTRA, SUB_REVIEW) = range(30)
+
+sub_flow.init_states({"SUB_LOC": SUB_LOC, "SUB_HUB": SUB_HUB,
+                      "SUB_EXTRA": SUB_EXTRA, "SUB_REVIEW": SUB_REVIEW})
 
 # Hand the Ajax flow module its state ids
 ajax_flow.init_states({
@@ -248,8 +256,8 @@ async def handle_service(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return OBJECT_TYPE
 
     elif choice == "alarm":
-        # Ajax wireless alarm calculator
-        return await ajax_flow.enter_ajax(update, context, t, get_lang)
+        # Alarm = SUBSCRIPTION (rental) calculator. Old one-off Ajax quote: ajax_flow.enter_ajax
+        return await sub_flow.enter(update, context, get_lang)
 
     else:  # contact
         kb = [[InlineKeyboardButton(t("btn_msg_manager", lang), url=SUPPORT_BOT_URL)]]
@@ -814,6 +822,114 @@ async def aj_review(update, context):
     return AFTER_QUOTE
 
 
+# =====================================================================
+# ALARM SUBSCRIPTION — wrappers + final step (quote + agreement PDF)
+# =====================================================================
+async def sb_loc(update, context):   return await sub_flow.handle_location(update, context, get_lang)
+async def sb_hub(update, context):   return await sub_flow.handle_hub(update, context, get_lang)
+async def sb_extra(update, context): return await sub_flow.handle_extra(update, context, get_lang)
+
+
+async def sb_review(update, context):
+    lang = get_lang(context)
+    query = update.callback_query
+    await query.answer()
+    action = query.data.split(":")[1]  # yes / restart / cancel
+
+    if action == "cancel":
+        await query.edit_message_text(t("cancelled", lang))
+        context.user_data.clear()
+        return ConversationHandler.END
+    if action == "restart":
+        await query.edit_message_text("🔁")
+        return await sub_flow.restart_selection(update, context, get_lang)
+
+    await query.edit_message_text(t("generating_pdf", lang))
+    data = context.user_data
+    sub = data.get("sub_quote") or pricing_sub.build_subscription(
+        data.get("sub_hub", "hub2"), data.get("sub_extras", {}))
+    loc = data.get("location")
+    customer = {
+        "name": data.get("name", "Client"), "phone": data.get("phone", ""),
+        "email": data.get("email", ""), "address": data.get("address", ""),
+        "telegram_chat_id": data.get("telegram_chat_id", ""),
+        "telegram_username": data.get("telegram_username", ""),
+    }
+
+    # quote number (KeyCRM counter, fallback local)
+    quote_number = None
+    try:
+        n = get_next_quote_number()
+        if n is not None:
+            quote_number = str(n)
+    except Exception:
+        pass
+    quote_number = quote_number or next_quote_number()
+
+    try:
+        pdf = generate_subscription_pdf({"sub": sub, "quote_number": quote_number,
+                                         "date": datetime.now(), "customer": customer,
+                                         "location": loc})
+    except Exception:
+        log.exception("Subscription PDF generation failed")
+        await context.bot.send_message(update.effective_chat.id, t("pdf_error", lang))
+        return ConversationHandler.END
+
+    fname = f"Spets-Subscription-{quote_number}.pdf"
+    try:
+        await context.bot.send_document(update.effective_chat.id, document=pdf, filename=fname,
+                                        caption=sub_flow.tx("caption", lang))
+    except Exception:
+        log.exception("Failed to send subscription PDF")
+
+    # email to customer
+    if customer["email"]:
+        try:
+            from email_sender import send_single_quote_email
+            send_single_quote_email(to_email=customer["email"], customer_name=customer["name"],
+                                    quote_number=quote_number, pdf_bytes=pdf,
+                                    subject_label="Alarm Subscription", lang=lang)
+        except Exception:
+            log.exception("Subscription email failed")
+
+    # KeyCRM
+    equip = "; ".join(f"{q}x {n}" for q, n in sub["equipment"])
+    crm_url = ""
+    try:
+        res = create_inquiry(
+            customer=customer,
+            inquiry_type=f"Alarm subscription £{sub['monthly_inc_vat']:.2f}/mo inc VAT",
+            details=(f"Quote {quote_number} | £{sub['monthly_ex_vat']:.2f}+VAT/mo | "
+                     f"install £{sub['install_ex_vat']:.2f}+VAT | {sub['min_term']}m | "
+                     f"{(loc or {}).get('url', 'no location')} | {equip}"),
+            extra_info={"service": "alarm_subscription"})
+        crm_url = res.get("url", "") if res.get("ok") else ""
+    except Exception:
+        log.exception("KeyCRM subscription push failed")
+
+    # notify admin (+ location pin)
+    if ADMIN_CHAT_ID:
+        try:
+            lines = "\n".join(f"• {l['qty']}× {l['name']} — £{l['total']:.2f}" for l in sub["lines"])
+            txt = (f"🆕 Alarm SUBSCRIPTION #{quote_number}\n\n"
+                   f"👤 {customer['name']}\n📞 {customer['phone']}\n📧 {customer['email']}\n"
+                   f"🏠 {customer['address']}\n"
+                   f"📍 {(loc or {}).get('url', '—')}\n\n{lines}\n\n"
+                   f"Devices £{sub['devices_monthly']:.2f} + overhead £{sub['overhead']:.2f}\n"
+                   f"💷 £{sub['monthly_ex_vat']:.2f} + VAT = £{sub['monthly_inc_vat']:.2f}/month\n"
+                   f"🔧 Install £{sub['install_inc_vat']:.2f} inc VAT\n"
+                   + (f"🔗 {crm_url}" if crm_url else ""))
+            await context.bot.send_message(ADMIN_CHAT_ID, txt, disable_web_page_preview=True)
+            await context.bot.send_document(ADMIN_CHAT_ID, document=pdf, filename=fname)
+            if loc:
+                await context.bot.send_location(ADMIN_CHAT_ID, latitude=loc["lat"], longitude=loc["lon"])
+        except Exception:
+            log.exception("Admin notify (subscription) failed")
+
+    await _show_after_quote_menu(update, context)
+    return AFTER_QUOTE
+
+
 def main():
     if not TELEGRAM_TOKEN:
         raise RuntimeError("TELEGRAM_TOKEN env variable is not set")
@@ -852,6 +968,11 @@ def main():
             AJAX_KEYPAD:    [CallbackQueryHandler(aj_keypad, pattern="^ajkp:")],
             AJAX_KEYFOB:    [CallbackQueryHandler(aj_keyfob, pattern="^ajkf:")],
             AJAX_REVIEW:    [CallbackQueryHandler(aj_review, pattern="^ajok:")],
+            # --- Alarm subscription flow ---
+            SUB_LOC:    [MessageHandler((filters.LOCATION | filters.TEXT) & ~filters.COMMAND, sb_loc)],
+            SUB_HUB:    [CallbackQueryHandler(sb_hub, pattern="^subhub:")],
+            SUB_EXTRA:  [CallbackQueryHandler(sb_extra, pattern="^subx:")],
+            SUB_REVIEW: [CallbackQueryHandler(sb_review, pattern="^subok:")],
         },
         fallbacks=[CommandHandler("cancel", cancel), CommandHandler("start", start)],
         per_chat=True,
