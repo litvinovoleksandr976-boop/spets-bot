@@ -101,6 +101,14 @@ def send_3_packages_email(to_email, customer_name, quote_number, quotes, pdfs, l
         incl = "incl. VAT"; att = "3 PDF quotes are attached — choose the package that fits you best."
         regards = "Best regards,"
 
+    if "Subscription" in subject_label:  # alarm subscription (rental) quote
+        intro = {"ru": "Во вложении: предложение по подписке на сигнализацию Ajax, договор и Terms &amp; Conditions.",
+                 "uk": "У вкладенні: пропозиція підписки на сигналізацію Ajax, договір та Terms &amp; Conditions.",
+                 }.get(lang, "Attached: your Ajax alarm subscription quote, agreement and Terms &amp; Conditions.")
+        note = {"ru": "Подпишите договор и отправьте нам — согласуем дату установки.",
+                "uk": "Підпишіть договір і надішліть нам — узгодимо дату встановлення.",
+                }.get(lang, "Please sign the agreement and send it back — we'll book your installation date.")
+
     html = f"""
     <!DOCTYPE html><html><head><meta charset="utf-8"></head>
     <body style="font-family:Arial,sans-serif;color:#14213D;line-height:1.6;">

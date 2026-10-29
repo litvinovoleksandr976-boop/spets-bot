@@ -210,8 +210,9 @@ async def get_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_lang(context)
     context.user_data["address"] = update.message.text.strip()
-    # → Show service menu (NEW)
-    return await show_service_menu(update, context)
+    # NEW PRODUCT: straight to alarm SUBSCRIPTION (location → hub → devices → price)
+    # Old service menu (CCTV / one-off Ajax): return await show_service_menu(update, context)
+    return await sub_flow.enter(update, context, get_lang)
 
 
 # =====================================================================
@@ -603,9 +604,8 @@ async def handle_after_quote(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     choice = query.data.replace("after:", "")
 
-    # "msg" no longer used (button is now a direct URL to support bot)
-    # back to main → service menu (keep contacts)
-    return await show_service_menu(update, context)
+    # back → new subscription calculation for the same client (contacts kept)
+    return await sub_flow.enter(update, context, get_lang)
 
 
 # =====================================================================
@@ -983,7 +983,7 @@ def main():
     app.add_handler(conv)
     app.add_handler(CommandHandler("help", help_cmd))
 
-    log.info("Bot starting...")
+    log.info("Bot starting... v8 SUBSCRIPTION")
     app.run_polling(drop_pending_updates=True)
 
 

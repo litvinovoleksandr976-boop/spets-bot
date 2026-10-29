@@ -22,19 +22,25 @@ TRANSLATIONS = {
         "uk": "✅ Мову встановлено на Українську",
     },
     "welcome": {
-        "en": "👋 Hello {name}!\n\nWelcome to *Spets Security* — CCTV quote service.\n\n"
-              "I'll ask you a few quick questions (about 1 minute) and send you "
-              "a personalised PDF quote to your email.\n\n"
-              "💡 _Tip: type /language anytime to switch to Russian or Ukrainian._\n\n"
-              "Let's start. *What is your full name?*",
-        "ru": "👋 Здравствуйте, {name}!\n\nДобро пожаловать в *Spets Security* — сервис расчёта CCTV.\n\n"
-              "Я задам вам несколько быстрых вопросов (около 1 минуты) и отправлю "
-              "персональное PDF-предложение на ваш email.\n\n"
-              "Давайте начнём. *Как вас полностью зовут?*",
-        "uk": "👋 Вітаю, {name}!\n\nЛаскаво просимо в *Spets Security* — сервіс розрахунку CCTV.\n\n"
-              "Я поставлю вам декілька швидких запитань (близько 1 хвилини) і надішлю "
-              "персональну PDF-пропозицію на вашу пошту.\n\n"
-              "Почнімо. *Як вас повністю звати?*",
+        "en": "👋 Hello {name}!\n\n*Spets Security* — Ajax alarm on a *monthly subscription*.\n"
+              "No upfront equipment cost: one fixed monthly payment covers the equipment, "
+              "service, support and repairs.\n\n"
+              "A few quick questions (1–2 minutes) and you'll get your monthly price, "
+              "quote and agreement as a PDF.\n\n"
+              "💡 _/language — switch to Russian or Ukrainian._\n\n"
+              "*What is your full name?*",
+        "ru": "👋 Здравствуйте, {name}!\n\n*Spets Security* — сигнализация Ajax по *ежемесячной подписке*.\n"
+              "Без оплаты за оборудование: один фиксированный платёж в месяц — "
+              "оборудование, обслуживание, поддержка и ремонт включены.\n\n"
+              "Несколько быстрых вопросов (1–2 минуты) — и вы получите цену в месяц, "
+              "предложение и договор в PDF.\n\n"
+              "*Как вас полностью зовут?*",
+        "uk": "👋 Вітаю, {name}!\n\n*Spets Security* — сигналізація Ajax за *щомісячною підпискою*.\n"
+              "Без оплати за обладнання: один фіксований платіж на місяць — "
+              "обладнання, обслуговування, підтримка та ремонт включені.\n\n"
+              "Кілька швидких запитань (1–2 хвилини) — і ви отримаєте ціну на місяць, "
+              "пропозицію та договір у PDF.\n\n"
+              "*Як вас повністю звати?*",
     },
 
     # ============================================================
@@ -267,21 +273,21 @@ TRANSLATIONS = {
     # ============================================================
     "help": {
         "en": "🆘 *Spets Security Bot — Help*\n\n"
-              "/start — Get a CCTV quote\n"
+              "/start — Alarm subscription quote\n"
               "/language — Change language\n"
               "/cancel — Cancel current conversation\n"
               "/help — This message\n\n"
               "📞 +44 7706 906079\n"
               "📧 r.brain@spetstech.co.uk",
         "ru": "🆘 *Spets Security Bot — Помощь*\n\n"
-              "/start — Получить предложение CCTV\n"
+              "/start — Расчёт подписки на сигнализацию\n"
               "/language — Сменить язык\n"
               "/cancel — Отменить текущий диалог\n"
               "/help — Это сообщение\n\n"
               "📞 +44 7706 906079\n"
               "📧 r.brain@spetstech.co.uk",
         "uk": "🆘 *Spets Security Bot — Допомога*\n\n"
-              "/start — Отримати пропозицію CCTV\n"
+              "/start — Розрахунок підписки на сигналізацію\n"
               "/language — Змінити мову\n"
               "/cancel — Скасувати поточний діалог\n"
               "/help — Це повідомлення\n\n"
@@ -515,9 +521,9 @@ TRANSLATIONS = {
         "uk": "💬 Написати менеджеру",
     },
     "btn_back_main": {
-        "en": "🏠 Back to Main Menu",
-        "ru": "🏠 На главное меню",
-        "uk": "🏠 На головне меню",
+        "en": "🔁 New calculation",
+        "ru": "🔁 Новый расчёт",
+        "uk": "🔁 Новий розрахунок",
     },
 
     # ============================================================
