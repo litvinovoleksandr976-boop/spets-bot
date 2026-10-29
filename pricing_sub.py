@@ -44,6 +44,11 @@ BASE_KIT_CONTENTS = [                   # (кількість, назва) — �
     (2, "Ajax SpaceControl S (keyfob)"),
 ]
 
+# Ключі пристроїв базового комплекту (той самий порядок, що й BASE_KIT_CONTENTS) —
+# потрібні для таблиці "Your system and what it costs" в PDF (offer_pack.py → DEVICE_INFO)
+BASE_KIT_KEYS = [("hub2", 1), ("motion", 2), ("door", 1), ("siren_out", 1),
+                 ("siren_in", 1), ("keyfob", 2)]
+
 # ---------------------------------------------------------------------------
 # 3) HUB OPTIONS  — доплата в місяць за апгрейд хаба (ex VAT)
 #    Hub 2 вже в базовому комплекті → 0
@@ -139,8 +144,17 @@ def build_subscription(hub: str = "hub2", extras: dict = None) -> dict:
         if key in extras:
             equipment.append([extras[key], EXTRAS[key]["name"] + " — additional"])
 
+    # Same list with device keys (for the offer-pack table)
+    items = [{"key": k, "qty": q, "extra": False} for k, q in BASE_KIT_KEYS]
+    if hub != "hub2":
+        items[0] = {"key": hub, "qty": 1, "extra": False}
+    for key in EXTRAS:
+        if key in extras:
+            items.append({"key": key, "qty": extras[key], "extra": True})
+
     return {
         "type": "subscription",
+        "items": items,
         "hub": hub,
         "extras": extras,
         "lines": lines,

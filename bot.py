@@ -869,7 +869,7 @@ async def sb_review(update, context):
     try:
         pdf = generate_subscription_pdf({"sub": sub, "quote_number": quote_number,
                                          "date": datetime.now(), "customer": customer,
-                                         "location": loc})
+                                         "location": loc, "lang": lang})
     except Exception:
         log.exception("Subscription PDF generation failed")
         await context.bot.send_message(update.effective_chat.id, t("pdf_error", lang))

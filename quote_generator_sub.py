@@ -21,11 +21,14 @@ from reportlab.lib.styles import ParagraphStyle
 from quote_generator import (
     BLACK, ORANGE, ORANGE_LIGHT, DARK_TEXT, MUTED_GREY, LIGHT_GREY, SOFT_BG,
     FONT_NAME, FONT_NAME_BOLD, FONT_SERIF_BOLD,
-    _draw_top_banner, _draw_bottom_banner,
+    _draw_top_banner, _draw_bottom_banner, _append_presentation,
 )
 import contract_texts as ct
 
 W = A4[0] - 40 * mm  # content width
+
+# Додати презентацію компанії (presentation.pdf, 14 слайдів) в кінець PDF. False = без неї
+APPEND_PRESENTATION = True
 
 
 def _m(v):
@@ -87,7 +90,26 @@ def _fill(text, v):
         return text
 
 
+# Use the 6-page dark OFFER PACK (offer_pack.py) when its files are present.
+USE_OFFER_PACK = True
+
+
 def generate_subscription_pdf(data: dict) -> bytes:
+    if USE_OFFER_PACK:
+        try:
+            import offer_pack
+            if offer_pack.available():
+                return offer_pack.build_offer_pdf(data["sub"], data.get("customer", {}),
+                                                  str(data.get("quote_number", "")),
+                                                  data.get("date") or datetime.now(),
+                                                  lang=data.get("lang", "en"))
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Offer pack failed — using simple PDF")
+    return _generate_simple_pdf(data)
+
+
+def _generate_simple_pdf(data: dict) -> bytes:
     """
     data = {"sub": <pricing_sub.build_subscription()>, "quote_number": "250",
             "date": datetime, "customer": {...}, "location": {"lat","lon","url"} | None}
@@ -242,7 +264,8 @@ def generate_subscription_pdf(data: dict) -> bytes:
 
     buf = io.BytesIO()
     _build(buf, _draw).build(story)
-    return buf.getvalue()
+    pdf = buf.getvalue()
+    return _append_presentation(pdf) if APPEND_PRESENTATION else pdf
 
 
 if __name__ == "__main__":

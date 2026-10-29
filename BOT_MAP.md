@@ -44,7 +44,11 @@
 | ПДВ | `pricing_sub.py` | `VAT_RATE` |
 | Мінімальний строк договору | `pricing_sub.py` | `MIN_TERM_MONTHS` |
 | Список «що входить щомісяця» | `pricing_sub.py` | `INCLUDED_SERVICES` |
-| **Текст договору** | `contract_texts.py` | `AGREEMENT_INTRO`, `AGREEMENT_CLAUSES` |
+| **Дані в PDF-пакеті (номер компанії, тарифи виїздів, депозит, страховка, ICO…)** | `offer_pack.py` | `OFFER_CONFIG` (None = лишається "[X]") |
+| Будь-який текст у PDF (3 мови), опис пристроїв | `offer_texts.py` | `T["en"]`, `T["ru"]`, `T["uk"]` |
+| Пункти договору (стор. 4) | `offer_texts.py` | `p4_rows` |
+| Старий білий PDF замість пакета | `quote_generator_sub.py` | `USE_OFFER_PACK = False` |
+| **Текст договору (старий білий PDF)** | `contract_texts.py` | `AGREEMENT_INTRO`, `AGREEMENT_CLAUSES` |
 | **Terms & Conditions** | `contract_texts.py` | `TERMS` |
 | Реквізити компанії в договорі | `contract_texts.py` | `COMPANY` |
 | Тексти кнопок/питань бота | `sub_flow.py` | словник `TXT` (uk/ru/en) |
@@ -61,7 +65,11 @@
 | `pricing_sub.py` | ⭐ **всі ціни підписки** |
 | `contract_texts.py` | ⭐ **договір і T&C** |
 | `sub_flow.py` | кроки підписки (локація → хаб → пристрої → підсумок) |
-| `quote_generator_sub.py` | PDF: пропозиція + договір + T&C |
+| `offer_pack.py` | ⭐ PDF-пакет 6 сторінок (темний дизайн), мова = мова клієнта в боті; для ru/uk + англійська версія в кінці (`APPEND_ENGLISH`) |
+| `offer_texts.py` | ⭐ **усі тексти 6 сторінок PDF — English / Русский / Українська** |
+| `offer_bg.jpg` | фон сторінок |
+| `Inter-*.ttf`, `InterDisplay-Bold.ttf` | шрифт пакета (з кирилицею) |
+| `quote_generator_sub.py` | запускає offer_pack (або старий білий PDF) |
 | `pricing.py`, `quote_generator.py` | CCTV (старий продаж) |
 | `pricing_ajax.py`, `ajax_flow.py`, `quote_generator_ajax.py` | Ajax разовий продаж (зараз вимкнений, залишений про запас) |
 | `email_sender.py` | відправка email через Brevo |
