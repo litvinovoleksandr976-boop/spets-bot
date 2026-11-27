@@ -1,85 +1,89 @@
-# 🗺 КАРТА БОТА — Spets Security (підписка на сигналізацію)
+# 🗺 СХЕМА БОТА — Spets Security (підписка на сигналізацію) · v8
 
-## Як іде клієнт по боту
+## 1. Шлях клієнта
 
 ```
-/start → мова → Ім'я → Телефон → Email → Адреса
-   └─ Меню послуг
-        ├─ 📹 CCTV ............ старий калькулятор (3 пакети, продаж)
-        ├─ 🛡 Сигналізація — підписка   ← НОВЕ
-        │     1. 📍 Локація (кнопка Telegram) або «Пропустити»
-        │     2. Хаб: Hub 2 (в комплекті) / Hub 2 Plus / Hub G3
-        │     3. Додаткові пристрої по черзі (0…6 шт), «✅ Готово» — одразу підсумок
-        │     4. Підсумок: £/міс + ПДВ, монтаж разово  → [Сформувати] [Змінити] [Скасувати]
-        │     5. PDF (пропозиція + договір + T&C) →
-        │          • клієнту в Telegram
-        │          • клієнту на email (Brevo)
-        │          • менеджеру в Telegram: деталі + PDF + 📍 пін на карті
-        │          • KeyCRM: замовлення з сумою, адресою і посиланням на Google Maps
-        └─ 💬 Менеджер
+/start → мова (UK / RU / EN)
+  → Ім'я → Телефон → Email → Адреса
+  → 📍 Локація: кнопка (тільки телефон) / індекс / посилання Google Maps / «Пропустити»
+  → 🛡 Хаб: Hub 2 (в комплекті) / Hub 2 Plus / Hub G3
+  → ➕ Додаткові пристрої по черзі (0…6 шт), «✅ Готово» — одразу на підсумок
+  → 🧾 Підсумок: £/міс + ПДВ, монтаж разово
+        [Сформувати]  [Змінити]  [Скасувати]
+  → 📄 PDF-пропозиція (6 темних сторінок; UK/RU = 6 своєю мовою + 6 англійською)
+        • клієнту в Telegram
+        • клієнту на email (Brevo)
+        • менеджеру в Telegram: деталі + PDF + 📍 пін
+        • KeyCRM: заявка з сумою, адресою, Google Maps
+  → кнопка «Новий розрахунок» → знову з кроку Локація
 ```
 
-## Формула ціни
+## 2. Блоки (файли) і як вони зв'язані
+
+```
+                 ┌────────────── bot.py ──────────────┐
+                 │ меню, кроки (стани), збирає все    │
+                 └──┬────────┬─────────┬────────┬─────┘
+                    │        │         │        │
+          translations.py  sub_flow.py │   keycrm.py → KeyCRM
+          (тексти меню)    (кроки      │   email_sender.py → Brevo → email
+                            підписки)  │
+                               │       │
+                         pricing_sub.py│  ← ⭐ ВСІ ЦІНИ
+                               │       │
+                     quote_generator_sub.py  (вибирає, який PDF робити)
+                               │
+                         offer_pack.py   ← ⭐ PDF (дизайн, реквізити OFFER_CONFIG)
+                         offer_texts.py  ← ⭐ тексти PDF 3 мовами
+                         offer_bg.jpg + шрифти Inter*.ttf
+                               │ (якщо помилка)
+                         запасний білий PDF ← contract_texts.py
+```
+
+## 3. Де що зберігається
+
+| Що | Де | Нюанс |
+|---|---|---|
+| Дані клієнта під час розмови (ім'я, телефон, вибір, розрахунок) | пам'ять бота `context.user_data` | бази немає: при перезапуску Railway незавершена розмова злітає, клієнт тисне /start |
+| Готова заявка | **KeyCRM** | головне постійне сховище |
+| PDF | Telegram клієнта і менеджера, email клієнта | на сервері не зберігається |
+| Ціни, тексти, реквізити | файли `.py` на GitHub | змінив файл → Railway перезапускає бота |
+| Ключі та паролі | Railway → Variables | у код не писати |
+
+## 4. Формула ціни (`pricing_sub.py`)
 
 ```
 пристрої  = базовий комплект £38 + доплата за хаб + додаткові пристрої
-накладні  = пристрої × 35%           (зв'язок, банкінг, обслуговуюча компанія)
-в місяць  = пристрої + накладні       (округлення вгору до £0.50)
-+ ПДВ 20% = сума, яку клієнт платить щомісяця
-монтаж    = £90 + ПДВ, один раз
+накладні  = пристрої × 35%                    (OVERHEAD_PCT)
+в місяць  = пристрої + накладні, вгору до £0.50
++ ПДВ 20% = клієнт платить щомісяця
+монтаж    = £90 + ПДВ, один раз               (INSTALL_FEE)
 ```
-Приклад: тільки базовий комплект → £38 + £13.30 = **£51.50 + ПДВ = £61.80/міс**, монтаж £108.
+Приклад: базовий комплект → £51.50 + ПДВ = **£61.80/міс**, монтаж £108.
 
-## ДЕ ЩО МІНЯТИ
+## 5. Де що міняти
 
-| Що хочу змінити | Файл | Що саме |
+| Що змінити | Файл | Що саме |
 |---|---|---|
-| Ціна базового комплекту (£38) | `pricing_sub.py` | `BASE_KIT_MONTHLY` |
-| Що входить у базовий комплект | `pricing_sub.py` | `BASE_KIT_CONTENTS` |
-| Ціна додаткового сенсора в місяць | `pricing_sub.py` | `EXTRAS` → `"monthly"` |
-| Які пристрої бот питає і в якому порядку | `pricing_sub.py` | `EXTRA_STEPS` |
+| Ціна базового комплекту | `pricing_sub.py` | `BASE_KIT_MONTHLY` |
+| Склад базового комплекту | `pricing_sub.py` | `BASE_KIT_CONTENTS`, `BASE_KIT_KEYS` |
+| Ціни додаткових пристроїв | `pricing_sub.py` | `EXTRAS` |
+| Які пристрої питає і в якому порядку | `pricing_sub.py` | `EXTRA_STEPS` |
 | Доплата за хаб | `pricing_sub.py` | `HUBS` |
-| Накладні 30–40% | `pricing_sub.py` | `OVERHEAD_PCT` (0.35 = 35%) |
-| Монтаж £90 | `pricing_sub.py` | `INSTALL_FEE` |
-| ПДВ | `pricing_sub.py` | `VAT_RATE` |
-| Мінімальний строк договору | `pricing_sub.py` | `MIN_TERM_MONTHS` |
-| Список «що входить щомісяця» | `pricing_sub.py` | `INCLUDED_SERVICES` |
-| **Дані в PDF-пакеті (номер компанії, тарифи виїздів, депозит, страховка, ICO…)** | `offer_pack.py` | `OFFER_CONFIG` (None = лишається "[X]") |
-| Будь-який текст у PDF (3 мови), опис пристроїв | `offer_texts.py` | `T["en"]`, `T["ru"]`, `T["uk"]` |
-| Пункти договору (стор. 4) | `offer_texts.py` | `p4_rows` |
-| Старий білий PDF замість пакета | `quote_generator_sub.py` | `USE_OFFER_PACK = False` |
-| **Текст договору (старий білий PDF)** | `contract_texts.py` | `AGREEMENT_INTRO`, `AGREEMENT_CLAUSES` |
-| **Terms & Conditions** | `contract_texts.py` | `TERMS` |
-| Реквізити компанії в договорі | `contract_texts.py` | `COMPANY` |
-| Тексти кнопок/питань бота | `sub_flow.py` | словник `TXT` (uk/ru/en) |
-| Назва кнопки в меню | `translations.py` | `svc_alarm` |
-| Дизайн PDF | `quote_generator_sub.py` | — (краще не чіпати) |
+| Накладні / монтаж / ПДВ / строк | `pricing_sub.py` | `OVERHEAD_PCT`, `INSTALL_FEE`, `VAT_RATE`, `MIN_TERM_MONTHS`, `NOTICE_DAYS` |
+| Тексти питань і кнопок підписки | `sub_flow.py` | словник `TXT` |
+| Привітання, меню | `translations.py` | — |
+| Цифри в PDF: депозит, тарифи виїздів, страховка, ICO, ARC, № компанії | `offer_pack.py` | `OFFER_CONFIG` (None = друкує «[X]») |
+| Телефон, email, адреса в PDF | `offer_pack.py` | `OFFER_CONFIG` |
+| Тексти сторінок PDF | `offer_texts.py` | `T["uk"/"ru"/"en"]` |
+| Чи додавати англійську копію до UK/RU | `offer_pack.py` | `APPEND_ENGLISH` |
+| Лист клієнту | `email_sender.py` | — |
+| Що летить у KeyCRM | `bot.py` → `sb_review` + `keycrm.py` | — |
 
-> Після зміни — завантаж файл на GitHub (назва файлу **малими літерами**), Railway сам перезапустить бота.
+> Після зміни: завантаж файл на GitHub (назва **малими літерами**, без «[1]») → дочекайся **Active** у Railway → перевір у Telegram.
 
-## Файли проєкту
+## 6. Змінні Railway
+`TELEGRAM_TOKEN`, `ADMIN_CHAT_ID`, `KEY_API_KEY`, `KEYCRM_SOURCE_ID`, `BREVO_API_KEY`, `SENDER_EMAIL`, `SENDER_NAME`, `REPLY_TO_EMAIL`
 
-| Файл | Для чого |
-|---|---|
-| `bot.py` | головний файл: меню, кроки, відправка PDF/email/KeyCRM |
-| `pricing_sub.py` | ⭐ **всі ціни підписки** |
-| `contract_texts.py` | ⭐ **договір і T&C** |
-| `sub_flow.py` | кроки підписки (локація → хаб → пристрої → підсумок) |
-| `offer_pack.py` | ⭐ PDF-пакет 6 сторінок (темний дизайн), мова = мова клієнта в боті; для ru/uk + англійська версія в кінці (`APPEND_ENGLISH`) |
-| `offer_texts.py` | ⭐ **усі тексти 6 сторінок PDF — English / Русский / Українська** |
-| `offer_bg.jpg` | фон сторінок |
-| `Inter-*.ttf`, `InterDisplay-Bold.ttf` | шрифт пакета (з кирилицею) |
-| `quote_generator_sub.py` | запускає offer_pack (або старий білий PDF) |
-| `pricing.py`, `quote_generator.py` | CCTV (старий продаж) |
-| `pricing_ajax.py`, `ajax_flow.py`, `quote_generator_ajax.py` | Ajax разовий продаж (зараз вимкнений, залишений про запас) |
-| `email_sender.py` | відправка email через Brevo |
-| `keycrm.py` | запис у KeyCRM |
-| `translations.py` | тексти бота 3 мовами |
-
-## Змінні в Railway (Variables)
-`TELEGRAM_TOKEN`, `ADMIN_CHAT_ID`, `KEYCRM_API_KEY`, `KEYCRM_SOURCE_ID`, `BREVO_API_KEY`, `SENDER_EMAIL`, `SENDER_NAME`, `REPLY_TO_EMAIL`
-
-## Повернути старий Ajax-калькулятор (разовий продаж)
-`bot.py` → функція `handle_service` → замінити
-`return await sub_flow.enter(update, context, get_lang)` на
-`return await ajax_flow.enter_ajax(update, context, t, get_lang)`
+## 7. Резервні / старі файли
+`pricing.py`, `quote_generator.py` — CCTV (старий продаж) · `pricing_ajax.py`, `ajax_flow.py`, `quote_generator_ajax.py` — Ajax разовий продаж (вимкнений) · `contract_texts.py` — тільки запасний білий PDF.
